@@ -45,6 +45,20 @@ service cloud.firestore {
       );
       allow delete: if isAdmin();
 
+      // Nested goals collection
+      match /goals/{goalId} {
+        allow read: if isAuthenticated() && isOwner(userId);
+        allow create: if isAuthenticated() && isOwner(userId);
+        allow update, delete: if isAuthenticated() && isOwner(userId);
+
+        // Nested progress collection
+        match /progress/{progressId} {
+          allow read: if isAuthenticated() && isOwner(userId);
+          allow create: if isAuthenticated() && isOwner(userId);
+          allow update, delete: if isAuthenticated() && isOwner(userId);
+        }
+      }
+
       // Nested journals collection
       match /journals/{journalId} {
         allow read: if isAuthenticated() && (

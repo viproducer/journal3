@@ -520,7 +520,7 @@ export default function DashboardPage() {
                 </Button>
               </div>
 
-              <div className="space-y-4">
+                <div className="space-y-4">
                 {entries.slice(0, 3).map((entry) => {
                   const categoryStyles = getCategoryStyles(entry.metadata?.type || 'mood-feelings')
                   return (
@@ -586,7 +586,7 @@ export default function DashboardPage() {
                       </p>
                       <div className="flex flex-wrap gap-1">
                         {entry.tags?.map((tag) => (
-                          <span 
+                          <span
                             key={tag} 
                             className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:bg-secondary"
                           >
@@ -606,12 +606,12 @@ export default function DashboardPage() {
                   )
                 })}
               </div>
-            </div>
+                </div>
 
             {/* Category Distribution */}
             <div>
-              <Card>
-                <CardHeader>
+            <Card>
+              <CardHeader>
                   <div className="flex items-center gap-2">
                     <PieChart className="h-5 w-5 text-blue-500" />
                     <CardTitle>Category Distribution</CardTitle>
@@ -619,26 +619,26 @@ export default function DashboardPage() {
                   <CardDescription>
                     Breakdown of your journal entries by category
                   </CardDescription>
-                </CardHeader>
+              </CardHeader>
                 <div className="p-6 pt-0">
-                  <div className="space-y-4">
+                <div className="space-y-4">
                     {categoryDistribution.map((category) => {
                       const percentage = totalEntries > 0 ? (category.count / totalEntries) * 100 : 0
                       return (
-                        <div key={category.name} className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
+                    <div key={category.name} className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
                               <div className={`rounded-full p-1 bg-opacity-20 ${category.color.replace('bg-', 'text-')}`}>
-                                {category.icon}
-                              </div>
-                              <span className="text-sm font-medium">{category.name}</span>
-                            </div>
-                            <span className="text-sm text-muted-foreground">{category.count}</span>
+                            {category.icon}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1">
-                              <div
-                                className={`h-2 rounded-full ${category.color}`}
+                          <span className="text-sm font-medium">{category.name}</span>
+                        </div>
+                        <span className="text-sm text-muted-foreground">{category.count}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <div
+                            className={`h-2 rounded-full ${category.color}`}
                                 style={{ width: `${percentage.toFixed(4)}%` }} 
                               />
                             </div>
@@ -647,9 +647,9 @@ export default function DashboardPage() {
                         </div>
                       )
                     })}
-                  </div>
+                    </div>
                 </div>
-              </Card>
+            </Card>
             </div>
           </div>
 

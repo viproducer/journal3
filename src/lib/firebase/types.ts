@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { Timestamp } from 'firebase/firestore';
 
 export type UserRole = 'user' | 'creator' | 'admin';
 
@@ -52,6 +53,8 @@ export interface JournalEntry {
   userId: string;
   journalId: string;
   content: string;
+  category: string;
+  type: string;
   mood?: string;
   tags?: string[];
   createdAt: Date;
@@ -109,21 +112,40 @@ export interface Goal {
   id?: string;
   userId: string;
   title: string;
-  description?: string;
+  description: string;
   category: string;
-  target: number;
-  current: number;
-  unit: string;
-  startDate: Date;
-  endDate?: Date;
-  status: 'active' | 'completed' | 'abandoned';
-  createdAt: Date;
-  updatedAt: Date;
-  relatedEntries?: string[]; // Array of entry IDs related to this goal
-  milestones?: {
-    value: number;
-    achieved: boolean;
-    achievedAt?: Date;
-    description?: string;
+  type: string;
+  targets: {
+    name: string;
+    value: string;
+    unit: string;
+    period: string;
+    secondaryValue?: string;
+    secondaryUnit?: string;
+    unitSystem?: "metric" | "imperial";
   }[];
+  progress: number;
+  goalStatement: string;
+  goalWhy: string;
+  nextSteps: string;
+  milestones: {
+    description: string;
+    completed: boolean;
+    targetValue?: string;
+  }[];
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+  metadata?: {
+    category: string;
+    type: string;
+  };
+}
+
+export interface GoalProgress {
+  id: string;
+  goalId: string;
+  value: number;
+  unit: string;
+  notes?: string;
+  date: Date;
 } 

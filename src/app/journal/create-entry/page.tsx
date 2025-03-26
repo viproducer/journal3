@@ -39,7 +39,7 @@ import ChallengesStreaksForm from "@/components/journal/challenges-streaks-form"
 export default function CreateEntryPage() {
   const router = useRouter()
   const { user } = useAuth()
-  const [selectedCategory, setSelectedCategory] = useState("mood-feelings")
+  const [selectedCategory, setSelectedCategory] = useState("goals-intentions")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -88,7 +88,48 @@ export default function CreateEntryPage() {
     }
   }, [templateParam])
 
+  const handleGoalSubmit = (data: { content: string; category: string; type: string; metadata: any }) => {
+    const form = document.querySelector('form')
+    if (!form) return
+
+    // Add hidden inputs with the goal data
+    const contentInput = document.createElement('input')
+    contentInput.type = 'hidden'
+    contentInput.name = 'content'
+    contentInput.value = data.content
+    form.appendChild(contentInput)
+
+    const categoryInput = document.createElement('input')
+    categoryInput.type = 'hidden'
+    categoryInput.name = 'category'
+    categoryInput.value = data.category
+    form.appendChild(categoryInput)
+
+    const typeInput = document.createElement('input')
+    typeInput.type = 'hidden'
+    typeInput.name = 'type'
+    typeInput.value = data.type
+    form.appendChild(typeInput)
+
+    const metadataInput = document.createElement('input')
+    metadataInput.type = 'hidden'
+    metadataInput.name = 'metadata'
+    metadataInput.value = JSON.stringify(data.metadata)
+    form.appendChild(metadataInput)
+
+    // Submit the form
+    form.requestSubmit()
+  }
+
   const categories = [
+    {
+      id: "goals-intentions",
+      name: "Goals & Intentions",
+      description: "Set and track your goals and intentions",
+      icon: <Target className="h-4 w-4" />,
+      color: "bg-green-500",
+      component: <GoalsIntentionsForm onSubmit={handleGoalSubmit} />
+    },
     {
       id: "mood-feelings",
       name: "Mood & Feelings",
@@ -109,13 +150,6 @@ export default function CreateEntryPage() {
       icon: <Star className="h-5 w-5" />,
       description: "Practice gratitude and reflect on experiences with guided prompts.",
       component: <GratitudeReflectionForm />,
-    },
-    {
-      id: "goals-intentions",
-      name: "Goals & Intentions",
-      icon: <Target className="h-5 w-5" />,
-      description: "Set, track, and reflect on goals with progress tracking and milestone management.",
-      component: <GoalsIntentionsForm />,
     },
     {
       id: "future-visioning",
@@ -169,25 +203,26 @@ export default function CreateEntryPage() {
 
   const selectedCategoryData = allCategories.find((category) => category.id === selectedCategory)
 
-  const handleSubmit = async (formData: FormData) => {
-    if (!user) {
-      setError('You must be logged in to create an entry')
-      return
-    }
-
-    setSubmitting(true)
-    setError(null)
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!user) return
 
     try {
-      // Get or create default journal
-      const userJournals = await getUserJournals(user.uid)
-      let journal = userJournals[0]
+      const formData = new FormData(e.currentTarget)
+      const content = formData.get('content') as string
+      const category = formData.get('category') as string
+      const type = formData.get('type') as string
+      const metadata = JSON.parse(formData.get('metadata') as string || '{}')
 
+      // Get or create default journal
+      const journals = await getUserJournals(user.uid)
+      let journal = journals[0] // Use the first journal or create a new one
+      
       if (!journal) {
         journal = await createJournal({
           userId: user.uid,
-          name: 'My Journal',
-          description: 'My personal journal',
+          name: "My Journal",
+          description: "My personal journal",
           isActive: true,
           isArchived: false,
           createdAt: new Date(),
@@ -200,98 +235,27 @@ export default function CreateEntryPage() {
         })
       }
 
-      // Collect form data based on the selected category
-      const metadata: any = {
-        type: selectedCategory || 'general',
-        title: formData.get('title') as string
+      if (!journal?.id) {
+        throw new Error('Failed to get or create journal')
       }
 
-      // Add category-specific data
-      if (selectedCategory === 'mood-feelings') {
-        metadata.moodLevel = Number(formData.get('mood_level')) || 50
-        metadata.primaryEmotion = formData.get('primary_emotion') as string
-        metadata.triggers = formData.get('triggers') as string
-        metadata.physical = formData.get('physical') as string
-        metadata.healthyResponse = formData.get('healthy_response') as string
-        metadata.reflection = formData.get('reflection') as string
-      } else if (selectedCategory === 'future-visioning') {
-        metadata.timeframe = formData.get('timeframe') as string
-        metadata.lifeArea = formData.get('lifeArea') as string
-        metadata.title = formData.get('title') as string
-        metadata.visionDescription = formData.get('visionDescription') as string
-        metadata.actionSteps = formData.get('actionSteps') as string
-        metadata.obstacles = formData.get('obstacles') as string
-        metadata.supportNeeded = formData.get('supportNeeded') as string
-
-        // Log the metadata for debugging
-        console.log('Future Visioning Metadata:', metadata)
-      } else if (selectedCategory === 'tracking-logs') {
-        metadata.metrics = formData.get('metrics') as string
-        metadata.notes = formData.get('notes') as string
-        metadata.trends = formData.get('trends') as string
-      } else if (selectedCategory === 'gratitude-reflection') {
-        // Get all gratitude points as an array
-        const gratitudePoints = [
-          formData.get('gratitudePoints[0]') as string,
-          formData.get('gratitudePoints[1]') as string,
-          formData.get('gratitudePoints[2]') as string
-        ].filter(point => point) // Remove any empty points
-        
-        metadata.gratitudePoints = gratitudePoints // Store as array instead of joining
-        metadata.highlight = formData.get('highlight') as string
-        metadata.learnings = formData.get('learnings') as string
-        metadata.nextSteps = formData.get('nextSteps') as string
-
-        // Log the metadata for debugging
-        console.log('Gratitude Reflection Metadata:', metadata)
-      } else if (selectedCategory === 'goals-intentions') {
-        metadata.goal = formData.get('goal') as string
-        metadata.progress = Number(formData.get('progress')) || 0
-        metadata.milestones = formData.get('milestones') as string
-        metadata.challenges = formData.get('challenges') as string
-        metadata.nextActions = formData.get('next_actions') as string
-      } else if (selectedCategory === 'journaling-prompts') {
-        metadata.prompt = formData.get('prompt') as string
-        metadata.response = formData.get('response') as string
-        metadata.insights = formData.get('insights') as string
-      } else if (selectedCategory === 'daily-checkins') {
-        metadata.energyLevel = Number(formData.get('energyLevel')) || 50
-        metadata.overallMood = Number(formData.get('overallMood')) || 50
-        metadata.todaysIntention = formData.get('todaysIntention') as string
-        metadata.dayReflection = formData.get('dayReflection') as string
-        metadata.bestPartOfDay = formData.get('bestPartOfDay') as string
-        metadata.biggestChallenge = formData.get('biggestChallenge') as string
-        metadata.todaysWins = formData.get('todaysWins') as string
-        metadata.gratitude = formData.get('gratitude') as string
-        metadata.focusForTomorrow = formData.get('focusForTomorrow') as string
-
-        // Log the metadata for debugging
-        console.log('Daily Check-in Metadata:', metadata)
-      } else if (selectedCategory === 'challenges-streaks') {
-        metadata.challenge = formData.get('challenge') as string
-        metadata.currentStreak = Number(formData.get('current_streak')) || 0
-        metadata.longestStreak = Number(formData.get('longest_streak')) || 0
-        metadata.progress = formData.get('progress') as string
-        metadata.obstacles = formData.get('obstacles') as string
-        metadata.strategies = formData.get('strategies') as string
-      }
-
-      const entryData: Omit<JournalEntry, 'id'> = {
+      const data = {
+        content,
+        category,
+        type,
         userId: user.uid,
-        journalId: journal.id || '',
-        content: formData.get('content') as string,
+        journalId: journal.id,
         createdAt: new Date(),
         updatedAt: new Date(),
         metadata
       }
 
-      await createEntry(entryData)
+      console.log('Creating entry with data:', data)
+      await createEntry(data)
       router.push('/journal/browse')
-    } catch (err) {
-      console.error('Error creating entry:', err)
-      setError('Failed to create entry. Please try again.')
-    } finally {
-      setSubmitting(false)
+    } catch (error) {
+      console.error('Error creating entry:', error)
+      alert('Failed to create entry. Please try again.')
     }
   }
 
@@ -332,78 +296,58 @@ export default function CreateEntryPage() {
             </p>
           </div>
 
-          <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full">
-            <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-6">
-              {categories.slice(0, 8).map((category) => (
-                <TabsTrigger key={category.id} value={category.id} className="flex items-center gap-2">
-                  {category.icon}
-                  <span className="truncate">{category.name}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
+          <form onSubmit={handleSubmit}>
+            <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full">
+              <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-6">
+                {categories.slice(0, 8).map((category) => (
+                  <TabsTrigger key={category.id} value={category.id} className="flex items-center gap-2">
+                    {category.icon}
+                    <span className="truncate">{category.name}</span>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
 
-            {marketplaceTemplates.length > 0 && (
-              <>
-                <div className="flex items-center gap-2 mt-6 mb-3">
-                  <ShoppingBag className="h-5 w-5 text-primary" />
-                  <h2 className="text-lg font-medium">Your Marketplace Journals</h2>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  {marketplaceTemplates.map((template) => (
-                    <Card
-                      key={template.id}
-                      className={`cursor-pointer hover:border-primary transition-colors ${selectedCategory === `marketplace-${template.id}` ? "border-primary" : ""}`}
-                      onClick={() => setSelectedCategory(`marketplace-${template.id}`)}
-                    >
-                      <CardContent className="p-4 flex items-center gap-3">
-                        <div className={`${template.color} text-white p-2 rounded-full`}>{template.icon}</div>
-                        <div>
-                          <h3 className="font-medium">{template.name}</h3>
-                          <p className="text-xs text-muted-foreground">{template.description}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </>
-            )}
-          </Tabs>
+              {marketplaceTemplates.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2 mt-6 mb-3">
+                    <ShoppingBag className="h-5 w-5 text-primary" />
+                    <h2 className="text-lg font-medium">Your Marketplace Journals</h2>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    {marketplaceTemplates.map((template) => (
+                      <Card
+                        key={template.id}
+                        className={`cursor-pointer hover:border-primary transition-colors ${selectedCategory === `marketplace-${template.id}` ? "border-primary" : ""}`}
+                        onClick={() => setSelectedCategory(`marketplace-${template.id}`)}
+                      >
+                        <CardContent className="p-4 flex items-center gap-3">
+                          <div className={`${template.color} text-white p-2 rounded-full`}>
+                            {template.icon}
+                          </div>
+                          <div>
+                            <h3 className="font-medium">{template.name}</h3>
+                            <p className="text-sm text-muted-foreground">{template.description}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </>
+              )}
 
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                {selectedCategoryData?.icon}
-                <CardTitle>{selectedCategoryData?.name}</CardTitle>
-              </div>
-              <CardDescription>{selectedCategoryData?.description}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={(e) => {
-                e.preventDefault()
-                const formData = new FormData(e.currentTarget)
-                handleSubmit(formData)
-              }}>
-                {selectedCategoryData?.component}
-                <div className="mt-6 flex justify-end gap-4">
-                  <Button variant="outline" asChild>
-                    <Link href="/journal/browse">Cancel</Link>
-                  </Button>
-                  <Button type="submit" disabled={submitting}>
-                    {submitting ? "Saving..." : "Save Entry"}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
-          {error && (
-            <div className="p-4 bg-red-50 text-red-600 rounded-md">
-              {error}
-            </div>
-          )}
+              <Card>
+                <CardContent className="p-6">
+                  {selectedCategoryData?.component && selectedCategory === 'goals-intentions' ? (
+                    <GoalsIntentionsForm onSubmit={handleGoalSubmit} />
+                  ) : (
+                    selectedCategoryData?.component
+                  )}
+                </CardContent>
+              </Card>
+            </Tabs>
+          </form>
         </div>
       </main>
     </div>
   )
 }
-

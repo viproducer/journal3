@@ -60,15 +60,19 @@ function convertToJournal(doc: DocumentData): Journal {
 
 // Helper function to convert Firestore document to JournalEntry type
 function convertToJournalEntry(doc: DocumentData): JournalEntry {
+  // Handle both Firestore QueryDocumentSnapshot and raw data objects
+  const data = doc.data ? doc.data() : doc;
   return {
     id: doc.id,
-    journalId: doc.journalId,
-    userId: doc.userId,
-    content: doc.content,
-    tags: doc.tags || [],
-    createdAt: doc.createdAt?.toDate() || new Date(),
-    updatedAt: doc.updatedAt?.toDate() || new Date(),
-    metadata: doc.metadata || {}
+    journalId: data.journalId,
+    userId: data.userId,
+    content: data.content,
+    category: data.category || data.metadata?.category || 'general',
+    type: data.type || data.metadata?.type || 'entry',
+    tags: data.tags || [],
+    createdAt: data.createdAt?.toDate() || new Date(),
+    updatedAt: data.updatedAt?.toDate() || new Date(),
+    metadata: data.metadata || {}
   };
 }
 
@@ -211,13 +215,32 @@ export const entriesCollection = collection(db, 'entries');
 
 export async function createEntry(entryData: Omit<JournalEntry, 'id'>) {
   try {
+    console.log('Creating entry with data:', entryData);
+    
     // Create the entry under the user's journal
     const entriesRef = getJournalEntriesCollection(entryData.userId, entryData.journalId);
-    const docRef = await addDoc(entriesRef, {
+    
+    // For goals, ensure consistent category and type
+    const isGoal = entryData.metadata?.goalStatement || entryData.metadata?.goalWhy;
+    
+    // Ensure category and type are stored at root level and in metadata
+    const entryToSave = {
       ...entryData,
+      // For goals, always use goals-intentions
+      category: isGoal ? 'goals-intentions' : (entryData.category || entryData.metadata?.category || 'general'),
+      type: isGoal ? 'goals-intentions' : (entryData.type || entryData.metadata?.type || 'entry'),
+      metadata: {
+        ...entryData.metadata,
+        // Ensure metadata has the same category and type
+        category: isGoal ? 'goals-intentions' : (entryData.category || entryData.metadata?.category || 'general'),
+        type: isGoal ? 'goals-intentions' : (entryData.type || entryData.metadata?.type || 'entry')
+      },
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now()
-    });
+    };
+
+    console.log('Saving entry with data:', entryToSave);
+    const docRef = await addDoc(entriesRef, entryToSave);
 
     // Update the journal's stats
     const journalRef = doc(getUserJournalsCollection(entryData.userId), entryData.journalId);
@@ -227,7 +250,7 @@ export async function createEntry(entryData: Omit<JournalEntry, 'id'>) {
       updatedAt: Timestamp.now()
     });
 
-    return { id: docRef.id, ...entryData };
+    return { id: docRef.id, ...entryToSave };
   } catch (error) {
     console.error('Error creating entry:', error);
     throw error;
@@ -446,9 +469,7 @@ export async function getUserGoals(userId: string): Promise<Goal[]> {
       id: doc.id,
       ...doc.data(),
       createdAt: doc.data().createdAt.toDate(),
-      updatedAt: doc.data().updatedAt.toDate(),
-      startDate: doc.data().startDate.toDate(),
-      endDate: doc.data().endDate?.toDate()
+      updatedAt: doc.data().updatedAt.toDate()
     })) as Goal[]
   } catch (error) {
     console.error('Error getting goals:', error)
