@@ -30,7 +30,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import MoodFeelingsForm from "@/components/journal/mood-feelings-form"
 import TrackingLogsForm from "@/components/journal/tracking-logs-form"
 import GratitudeReflectionForm from "@/components/journal/gratitude-reflection-form"
-import GoalsIntentionsForm from "@/components/journal/goals-intentions-form"
 import FutureVisioningForm from "@/components/journal/future-visioning-form"
 import JournalingPromptsForm from "@/components/journal/journaling-prompts-form"
 import DailyCheckinsForm from "@/components/journal/daily-checkins-form"
@@ -39,7 +38,7 @@ import ChallengesStreaksForm from "@/components/journal/challenges-streaks-form"
 export default function CreateEntryPage() {
   const router = useRouter()
   const { user } = useAuth()
-  const [selectedCategory, setSelectedCategory] = useState("goals-intentions")
+  const [selectedCategory, setSelectedCategory] = useState("mood-feelings")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -122,14 +121,6 @@ export default function CreateEntryPage() {
   }
 
   const categories = [
-    {
-      id: "goals-intentions",
-      name: "Goals & Intentions",
-      description: "Set and track your goals and intentions",
-      icon: <Target className="h-4 w-4" />,
-      color: "bg-green-500",
-      component: <GoalsIntentionsForm onSubmit={handleGoalSubmit} />
-    },
     {
       id: "mood-feelings",
       name: "Mood & Feelings",
@@ -337,11 +328,7 @@ export default function CreateEntryPage() {
 
               <Card>
                 <CardContent className="p-6">
-                  {selectedCategoryData?.component && selectedCategory === 'goals-intentions' ? (
-                    <GoalsIntentionsForm onSubmit={handleGoalSubmit} />
-                  ) : (
-                    selectedCategoryData?.component
-                  )}
+                  {selectedCategoryData?.component}
                 </CardContent>
               </Card>
             </Tabs>

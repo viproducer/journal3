@@ -62,6 +62,17 @@ interface EditTemplatePageProps {
 
 type TemplateField = MarketplaceTemplate['fields'][number]
 
+interface NewField {
+  id: string;
+  name: string;
+  label: string;
+  type: string;
+  required: boolean;
+  options?: string[];
+  placeholder?: string;
+  description?: string;
+}
+
 export default function EditTemplatePage({ params }: EditTemplatePageProps) {
   const router = useRouter()
   const { user, loading, hasRole } = useAuth()
@@ -72,7 +83,7 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
   const [previewMode, setPreviewMode] = useState(false)
   const [showAddField, setShowAddField] = useState(false)
   const [editingField, setEditingField] = useState<TemplateField | null>(null)
-  const [newField, setNewField] = useState<TemplateField>({
+  const [newField, setNewField] = useState<NewField>({
     id: "",
     name: "",
     label: "",
@@ -192,7 +203,16 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
 
   const handleEditField = (field: TemplateField) => {
     setEditingField(field)
-    setNewField(field)
+    setNewField({
+      id: field.id,
+      name: field.name,
+      label: field.label,
+      type: field.type,
+      required: field.required,
+      options: field.options || [],
+      placeholder: field.placeholder || "",
+      description: field.description || ""
+    })
     setShowAddField(true)
   }
 
@@ -205,20 +225,22 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
   }
 
   const handleAddOption = () => {
-    if (newOption && !newField.options.includes(newOption)) {
+    const options = newField.options || [];
+    if (newOption && !options.includes(newOption)) {
       setNewField({
         ...newField,
-        options: [...newField.options, newOption],
-      })
-      setNewOption("")
+        options: [...options, newOption],
+      });
+      setNewOption('');
     }
   }
 
   const handleRemoveOption = (option: string) => {
+    const options = newField.options || [];
     setNewField({
       ...newField,
-      options: newField.options.filter((item) => item !== option),
-    })
+      options: options.filter((item) => item !== option),
+    });
   }
 
   const addFeature = () => {

@@ -79,6 +79,8 @@ export interface MarketplaceTemplate {
   tags: string[];
   createdAt: Date;
   updatedAt: Date;
+  users?: number;
+  rating?: number;
   settings: {
     allowCustomization: boolean;
     requireApproval: boolean;
@@ -108,38 +110,41 @@ export interface UserSubscription {
   settings?: Record<string, any>;
 }
 
-export interface Goal {
+export type UnitType = "count" | "distance" | "time" | "weight" | "percentage" | "money" | "volume" | "swimming" | "running" | "cycling" | "strength";
+
+export type Target = {
+  name: string;
+  value: string;
+  unit: string;
+  period: string;
+  startValue: string;
+  currentValue: string;
+  unitType: UnitType;
+  unitSystem: "metric" | "imperial";
+  targetDate?: string;
+  direction: 'min' | 'max';
+};
+
+export type Goal = {
   id?: string;
   userId: string;
   title: string;
   description: string;
-  category: string;
+  category: "Health" | "Finance" | "Personal Growth" | "Relationships" | "Creativity" | "Productivity" | "Other";
   type: string;
-  targets: {
-    name: string;
-    value: string;
-    unit: string;
-    period: string;
-    secondaryValue?: string;
-    secondaryUnit?: string;
-    unitSystem?: "metric" | "imperial";
-  }[];
+  targets: Target[];
   progress: number;
   goalStatement: string;
   goalWhy: string;
   nextSteps: string;
-  milestones: {
-    description: string;
-    completed: boolean;
-    targetValue?: string;
-  }[];
-  createdAt?: Timestamp;
-  updatedAt?: Timestamp;
-  metadata?: {
-    category: string;
+  milestones: any[];
+  createdAt: any;
+  updatedAt: any;
+  metadata: {
+    category: "Health" | "Finance" | "Personal Growth" | "Relationships" | "Creativity" | "Productivity" | "Other";
     type: string;
   };
-}
+};
 
 export interface GoalProgress {
   id: string;
@@ -148,4 +153,34 @@ export interface GoalProgress {
   unit: string;
   notes?: string;
   date: Date;
+}
+
+export type TrackingUpdate = {
+  targetName: string;
+  currentValue: number;
+  photoUrls: string[];
+  reflection: string;
+  timestamp: Date;
+};
+
+export type ProgressData = {
+  targetName: string;
+  currentValue: number;
+  photoUrls: string[];
+  reflection: string;
+  timestamp: Date;
+};
+
+export interface ProgressHistory {
+  id: string;
+  goalId: string;
+  userId: string;
+  targetName: string;
+  value: string;
+  currentValue: number;
+  photoUrls: string[];
+  reflection: string;
+  timestamp: Date;
+  createdAt: Date;
+  updatedAt: Date;
 } 

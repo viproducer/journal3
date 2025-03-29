@@ -14,6 +14,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 type UnitSystem = "metric" | "imperial"
 
+interface UnitDefinition {
+  metric: string
+  imperial: string
+  secondary?: {
+    metric: string
+    imperial: string
+  }
+  tertiary?: {
+    metric: string
+    imperial: string
+  }
+}
+
 interface Target {
   name: string
   value: string
@@ -24,6 +37,8 @@ interface Target {
   trackingType: 'period' | 'date'
   secondaryValue?: string
   secondaryUnit?: string
+  tertiaryValue?: string
+  tertiaryUnit?: string
   unitSystem?: UnitSystem
 }
 
@@ -92,7 +107,7 @@ export default function GoalsIntentionsForm({ onSubmit }: GoalsIntentionsFormPro
     "other": ["Custom"]
   }
 
-  const units = {
+  const units: Record<string, UnitDefinition> = {
     "Weight Loss": {
       metric: "kg",
       imperial: "lbs"
@@ -111,19 +126,39 @@ export default function GoalsIntentionsForm({ onSubmit }: GoalsIntentionsFormPro
     },
     "Walking": {
       metric: "km",
-      imperial: "miles"
+      imperial: "miles",
+      secondary: {
+        metric: "minutes",
+        imperial: "minutes"
+      }
     },
     "Running": {
       metric: "km",
-      imperial: "miles"
+      imperial: "miles",
+      secondary: {
+        metric: "minutes",
+        imperial: "minutes"
+      }
     },
     "Cycling": {
       metric: "km",
-      imperial: "miles"
+      imperial: "miles",
+      secondary: {
+        metric: "minutes",
+        imperial: "minutes"
+      }
     },
     "Swimming": {
       metric: "laps",
-      imperial: "laps"
+      imperial: "laps",
+      secondary: {
+        metric: "meters",
+        imperial: "yards"
+      },
+      tertiary: {
+        metric: "minutes",
+        imperial: "minutes"
+      }
     },
     "Strength Training": {
       metric: "kg",
@@ -189,6 +224,15 @@ export default function GoalsIntentionsForm({ onSubmit }: GoalsIntentionsFormPro
     const typeUnits = units[goalType as keyof typeof units]
     if (!typeUnits) {
       return [{ value: "custom", label: "Custom", system: "metric" }]
+    }
+
+    // Special handling for swimming to show laps as primary unit
+    if (goalType === "Swimming") {
+      return [
+        { value: "laps", label: "Laps", system: "metric" },
+        { value: "meters", label: "Meters", system: "metric" },
+        { value: "yards", label: "Yards", system: "imperial" }
+      ]
     }
 
     return [
@@ -265,7 +309,12 @@ export default function GoalsIntentionsForm({ onSubmit }: GoalsIntentionsFormPro
           unit: target.unit,
           period: target.period,
           targetDate: target.targetDate,
-          trackingType: target.trackingType
+          trackingType: target.trackingType,
+          secondaryValue: target.secondaryValue,
+          secondaryUnit: target.secondaryUnit,
+          tertiaryValue: target.tertiaryValue,
+          tertiaryUnit: target.tertiaryUnit,
+          unitSystem: target.unitSystem
         })),
         progress: 0
       }
@@ -301,113 +350,120 @@ export default function GoalsIntentionsForm({ onSubmit }: GoalsIntentionsFormPro
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-4">
-        <div>
-          <Label htmlFor="goalCategory">Goal Category</Label>
-          <Select value={goalCategory} onValueChange={setGoalCategory}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select a category" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.keys(goalTypes).map((category) => (
-                <SelectItem key={category} value={category}>
-                  {category.charAt(0).toUpperCase() + category.slice(1)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <div className="space-y-6 w-full max-w-5xl mx-auto px-4">
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <Label htmlFor="goalCategory">Goal Category</Label>
+            <Select value={goalCategory} onValueChange={setGoalCategory}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a category" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.keys(goalTypes).map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="goalType">Goal Type</Label>
+            <Select value={goalType} onValueChange={handleGoalTypeChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a goal type" />
+              </SelectTrigger>
+              <SelectContent>
+                {goalTypes[goalCategory as keyof typeof goalTypes].map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="goalStatement">Goal Statement</Label>
+            <Textarea
+              id="goalStatement"
+              value={goalStatement}
+              onChange={(e) => setGoalStatement(e.target.value)}
+              placeholder="What do you want to achieve?"
+              className="min-h-[100px] w-full"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="goalWhy">Why This Goal?</Label>
+            <Textarea
+              id="goalWhy"
+              value={goalWhy}
+              onChange={(e) => setGoalWhy(e.target.value)}
+              placeholder="Why is this goal important to you?"
+              className="min-h-[100px] w-full"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="nextSteps">Next Steps</Label>
+            <Textarea
+              id="nextSteps"
+              value={nextSteps}
+              onChange={(e) => setNextSteps(e.target.value)}
+              placeholder="What are your next steps to achieve this goal?"
+              className="min-h-[100px] w-full"
+            />
+          </div>
         </div>
 
         <div>
-          <Label htmlFor="goalType">Goal Type</Label>
-          <Select value={goalType} onValueChange={handleGoalTypeChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select a goal type" />
-            </SelectTrigger>
-            <SelectContent>
-              {goalTypes[goalCategory as keyof typeof goalTypes].map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label htmlFor="goalStatement">Goal Statement</Label>
-          <Textarea
-            id="goalStatement"
-            value={goalStatement}
-            onChange={(e) => setGoalStatement(e.target.value)}
-            placeholder="What do you want to achieve?"
-            className="min-h-[100px]"
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="goalWhy">Why This Goal?</Label>
-          <Textarea
-            id="goalWhy"
-            value={goalWhy}
-            onChange={(e) => setGoalWhy(e.target.value)}
-            placeholder="Why is this goal important to you?"
-            className="min-h-[100px]"
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="nextSteps">Next Steps</Label>
-          <Textarea
-            id="nextSteps"
-            value={nextSteps}
-            onChange={(e) => setNextSteps(e.target.value)}
-            placeholder="What are your next steps to achieve this goal?"
-            className="min-h-[100px]"
-          />
-        </div>
-
-        <div>
-          <Label>Targets</Label>
-          <div className="space-y-4">
+          <Label className="text-lg font-semibold mb-4 block">Targets</Label>
+          <div className="space-y-6">
             {targets.map((target, index) => (
-              <div key={index} className="space-y-4 p-4 border rounded-lg">
-                <div className="flex gap-4 items-start">
-                  <div className="flex-1">
+              <div key={index} className="space-y-6 p-6 border rounded-lg bg-card shadow-sm">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
                     <Label>Target Name</Label>
                     <Input
                       placeholder="Target name"
                       value={target.name}
                       onChange={(e) => updateTarget(index, "name", e.target.value)}
+                      className="w-full"
                     />
                   </div>
-                  <div className="flex-1">
+                  <div>
                     <Label>Starting Value</Label>
                     <Input
                       type="number"
                       placeholder="Current value"
                       value={target.startValue}
                       onChange={(e) => updateTarget(index, "startValue", e.target.value)}
+                      className="w-full"
                     />
                   </div>
-                  <div className="flex-1">
+                  <div>
                     <Label>Target Value</Label>
                     <Input
                       type="number"
                       placeholder="Goal value"
                       value={target.value}
                       onChange={(e) => updateTarget(index, "value", e.target.value)}
+                      className="w-full"
                     />
                   </div>
                 </div>
-                <div className="flex gap-4 items-start">
-                  <div className="flex-1">
-                    <Label>Unit</Label>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div>
+                    <Label>Primary Unit</Label>
                     <Select 
                       value={target.unit} 
                       onValueChange={(value) => {
-                        // Allow custom unit input if selected
                         if (value === "custom") {
                           const customUnit = prompt("Enter custom unit:")
                           if (customUnit) {
@@ -418,29 +474,89 @@ export default function GoalsIntentionsForm({ onSubmit }: GoalsIntentionsFormPro
                         }
                       }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Unit" />
                       </SelectTrigger>
                       <SelectContent>
-                        {/* Add common units that make sense for any target */}
-                        <SelectItem value="kg">Kilograms (kg)</SelectItem>
-                        <SelectItem value="lbs">Pounds (lbs)</SelectItem>
-                        <SelectItem value="cm">Centimeters (cm)</SelectItem>
-                        <SelectItem value="inches">Inches (in)</SelectItem>
-                        <SelectItem value="minutes">Minutes</SelectItem>
-                        <SelectItem value="hours">Hours</SelectItem>
-                        <SelectItem value="currency">Currency</SelectItem>
+                        {getUnitOptions(goalType).map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                         <SelectItem value="custom">Custom...</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex-1">
+
+                  {units[goalType as keyof typeof units]?.secondary && (
+                    <div className="space-y-2">
+                      <Label>Secondary Unit</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          placeholder="Secondary value"
+                          value={target.secondaryValue || ""}
+                          onChange={(e) => updateTarget(index, "secondaryValue", e.target.value)}
+                          className="flex-1"
+                        />
+                        <Select 
+                          value={target.secondaryUnit || ""} 
+                          onValueChange={(value) => updateTarget(index, "secondaryUnit", value)}
+                        >
+                          <SelectTrigger className="w-[120px]">
+                            <SelectValue placeholder="Unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={units[goalType as keyof typeof units].secondary?.metric || ""}>
+                              {units[goalType as keyof typeof units].secondary?.metric}
+                            </SelectItem>
+                            <SelectItem value={units[goalType as keyof typeof units].secondary?.imperial || ""}>
+                              {units[goalType as keyof typeof units].secondary?.imperial}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+
+                  {units[goalType as keyof typeof units]?.tertiary && (
+                    <div className="space-y-2">
+                      <Label>Tertiary Unit</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          placeholder="Tertiary value"
+                          value={target.tertiaryValue || ""}
+                          onChange={(e) => updateTarget(index, "tertiaryValue", e.target.value)}
+                          className="flex-1"
+                        />
+                        <Select 
+                          value={target.tertiaryUnit || ""} 
+                          onValueChange={(value) => updateTarget(index, "tertiaryUnit", value)}
+                        >
+                          <SelectTrigger className="w-[120px]">
+                            <SelectValue placeholder="Unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={units[goalType as keyof typeof units].tertiary?.metric || ""}>
+                              {units[goalType as keyof typeof units].tertiary?.metric}
+                            </SelectItem>
+                            <SelectItem value={units[goalType as keyof typeof units].tertiary?.imperial || ""}>
+                              {units[goalType as keyof typeof units].tertiary?.imperial}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
                     <Label>Tracking Type</Label>
                     <Select 
                       value={target.trackingType} 
                       onValueChange={(value: 'period' | 'date') => updateTarget(index, "trackingType", value)}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="How to track?" />
                       </SelectTrigger>
                       <SelectContent>
@@ -449,11 +565,12 @@ export default function GoalsIntentionsForm({ onSubmit }: GoalsIntentionsFormPro
                       </SelectContent>
                     </Select>
                   </div>
+
                   {target.trackingType === 'period' ? (
-                    <div className="flex-1">
+                    <div>
                       <Label>Period</Label>
                       <Select value={target.period} onValueChange={(value) => updateTarget(index, "period", value)}>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Period" />
                         </SelectTrigger>
                         <SelectContent>
@@ -466,26 +583,28 @@ export default function GoalsIntentionsForm({ onSubmit }: GoalsIntentionsFormPro
                       </Select>
                     </div>
                   ) : (
-                    <div className="flex-1">
+                    <div>
                       <Label>Target Date</Label>
                       <Input
                         type="date"
                         value={target.targetDate}
                         onChange={(e) => updateTarget(index, "targetDate", e.target.value)}
+                        className="w-full"
                       />
                     </div>
                   )}
-                  <div className="flex items-end">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeTarget(index)}
-                      className="shrink-0"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeTarget(index)}
+                    className="shrink-0"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             ))}

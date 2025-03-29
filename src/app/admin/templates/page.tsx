@@ -37,6 +37,7 @@ import {
   Trash2,
   MoreHorizontal,
 } from "lucide-react"
+import { format } from "date-fns"
 
 export default function AdminTemplatesPage() {
   const router = useRouter()
@@ -150,10 +151,10 @@ export default function AdminTemplatesPage() {
                       </TableCell>
                       <TableCell className="text-right">{template.users?.toLocaleString() ?? 0}</TableCell>
                       <TableCell className="text-right">
-                        {template.rating > 0 ? template.rating.toFixed(1) : "-"}
+                        {(template.rating || 0) > 0 ? (template.rating || 0).toFixed(1) : "-"}
                       </TableCell>
                       <TableCell className="text-right">
-                        {new Date(template.updatedAt).toLocaleDateString()}
+                        {template.updatedAt ? format(template.updatedAt, 'MMM d, yyyy') : '-'}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>

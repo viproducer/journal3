@@ -14,10 +14,12 @@ import {
   DocumentData,
   increment,
   setDoc,
-  collectionGroup
+  collectionGroup,
+  writeBatch,
+  arrayUnion
 } from 'firebase/firestore';
 import { db } from './config';
-import { Journal, JournalEntry, MarketplaceTemplate, UserSubscription, UserProfile, UserRole, Goal } from './types';
+import { Journal, JournalEntry, MarketplaceTemplate, UserSubscription, UserProfile, UserRole, Goal, ProgressHistory } from './types';
 
 // Helper function to get user's journals collection reference
 function getUserJournalsCollection(userId: string) {
@@ -445,16 +447,95 @@ const getGoalsCollection = (userId: string) => collection(db, 'users', userId, '
 // Create a new goal
 export async function createGoal(goal: Omit<Goal, 'id'>): Promise<Goal> {
   try {
-    const goalsRef = getGoalsCollection(goal.userId)
-    const docRef = await addDoc(goalsRef, {
+    console.log('Starting goal creation with data:', goal);
+
+    if (!goal.userId) {
+      console.error('No userId provided for goal creation');
+      throw new Error('User ID is required');
+    }
+
+    // Validate required fields
+    if (!goal.title || !goal.description || !goal.category || !goal.type || !goal.targets || goal.targets.length === 0) {
+      console.error('Missing required fields for goal creation');
+      throw new Error('Missing required fields');
+    }
+
+    // Validate target fields
+    goal.targets.forEach((target, index) => {
+      if (!target.name || !target.value || !target.unit) {
+        console.error(`Missing required fields for target ${index}`);
+        throw new Error(`Missing required fields for target ${index + 1}`);
+      }
+    });
+
+    // First ensure user document exists
+    const userRef = doc(db, 'users', goal.userId);
+    console.log('Checking user document at:', `users/${goal.userId}`);
+    
+    const userDoc = await getDoc(userRef);
+    
+    if (!userDoc.exists()) {
+      console.log('User document does not exist, creating it...');
+      await setDoc(userRef, {
+        id: goal.userId,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+        isActive: true,
+        settings: {
+          notifications: true,
+          privacy: {
+            shareJournals: false,
+            allowAnalytics: true
+          }
+        }
+      });
+      console.log('User document created successfully');
+    } else {
+      console.log('User document exists');
+    }
+
+    const goalsRef = getGoalsCollection(goal.userId);
+    console.log('Creating goal in collection:', `users/${goal.userId}/goals`);
+    
+    // Ensure all fields have valid values
+    const goalToSave = {
       ...goal,
+      title: goal.title.trim(),
+      description: goal.description.trim(),
+      targets: goal.targets.map(target => ({
+        ...target,
+        name: target.name.trim(),
+        value: target.value.trim(),
+        unit: target.unit.trim(),
+        startValue: target.startValue || "0",
+        currentValue: target.currentValue || "0",
+        unitType: target.unitType || "count",
+        unitSystem: target.unitSystem || "metric",
+        direction: target.direction || "max"
+      })),
+      goalStatement: goal.goalStatement?.trim() || "",
+      goalWhy: goal.goalWhy?.trim() || "",
+      nextSteps: goal.nextSteps?.trim() || "",
+      progress: goal.progress || 0,
+      milestones: goal.milestones || [],
       createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now()
-    })
-    return { id: docRef.id, ...goal }
+      updatedAt: Timestamp.now(),
+      metadata: {
+        category: goal.category,
+        type: goal.type,
+        ...goal.metadata
+      }
+    };
+
+    console.log('Saving goal data:', goalToSave);
+    
+    const docRef = await addDoc(goalsRef, goalToSave);
+
+    console.log('Goal created successfully with ID:', docRef.id);
+    return { id: docRef.id, ...goalToSave };
   } catch (error) {
-    console.error('Error creating goal:', error)
-    throw error
+    console.error('Error creating goal:', error);
+    throw error;
   }
 }
 
@@ -478,18 +559,17 @@ export async function getUserGoals(userId: string): Promise<Goal[]> {
 }
 
 // Update a goal
-export async function updateGoal(userId: string, goalId: string, updates: Partial<Goal>): Promise<void> {
+export const updateGoal = async (userId: string, goalId: string, goalData: Omit<Goal, 'id'>): Promise<Goal> => {
   try {
-    const goalRef = doc(getGoalsCollection(userId), goalId)
-    await updateDoc(goalRef, {
-      ...updates,
-      updatedAt: Timestamp.now()
-    })
+    const goalRef = doc(db, 'users', userId, 'goals', goalId);
+    const goalWithId = { ...goalData, id: goalId };
+    await updateDoc(goalRef, goalData);
+    return goalWithId;
   } catch (error) {
-    console.error('Error updating goal:', error)
-    throw error
+    console.error('Error updating goal:', error);
+    throw error;
   }
-}
+};
 
 // Delete a goal
 export async function deleteGoal(userId: string, goalId: string): Promise<void> {
@@ -565,5 +645,181 @@ export async function getAverageEntryTime(userId: string, journalId: string): Pr
   } catch (error) {
     console.error('Error calculating average entry time:', error)
     throw error
+  }
+}
+
+// Add function to save progress history
+export const saveProgressHistory = async (
+  userId: string,
+  goalId: string,
+  updates: Array<{
+    targetName: string;
+    currentValue: number;
+    photoUrls: string[];
+    reflection: string;
+    timestamp: Date;
+  }>,
+  userEmail: string
+): Promise<void> => {
+  try {
+    console.log('Starting saveProgressHistory with data:', {
+      userId,
+      goalId,
+      updates,
+      userEmail
+    });
+
+    // First ensure user document exists with all required fields
+    const userRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userRef);
+    
+    if (!userDoc.exists()) {
+      console.log('User document does not exist, creating it...');
+      await setDoc(userRef, {
+        id: userId,
+        email: userEmail,
+        role: 'user',
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+        isActive: true,
+        subscribedTemplates: [],
+        settings: {
+          notifications: true,
+          privacy: {
+            shareJournals: false,
+            allowAnalytics: true
+          }
+        }
+      });
+      console.log('User document created successfully');
+    } else {
+      // Check if user document has all required fields
+      const userData = userDoc.data();
+      if (!userData.email || !userData.role || !userData.createdAt || !userData.updatedAt) {
+        console.log('User document missing required fields, updating...');
+        await setDoc(userRef, {
+          ...userData,
+          email: userData.email || userEmail,
+          role: userData.role || 'user',
+          createdAt: userData.createdAt || Timestamp.now(),
+          updatedAt: Timestamp.now(),
+          isActive: userData.isActive ?? true,
+          subscribedTemplates: userData.subscribedTemplates || [],
+          settings: userData.settings || {
+            notifications: true,
+            privacy: {
+              shareJournals: false,
+              allowAnalytics: true
+            }
+          }
+        }, { merge: true });
+        console.log('User document updated successfully');
+      }
+    }
+
+    // Create a new progress history entry
+    const progressData = {
+      goalId: goalId,
+      userId: userId,
+      targetName: updates[0].targetName,
+      value: updates[0].currentValue.toString(),
+      currentValue: updates[0].currentValue,
+      photoUrls: updates[0].photoUrls || [],
+      reflection: updates[0].reflection || '',
+      timestamp: Timestamp.fromDate(updates[0].timestamp),
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    };
+
+    // Log the data being sent to Firestore
+    console.log('Attempting to save progress data to Firestore:', progressData);
+
+    // Create a new document in the nested progress_history collection
+    const progressHistoryRef = collection(db, 'users', userId, 'goals', goalId, 'progress_history');
+    const docRef = await addDoc(progressHistoryRef, progressData);
+    console.log('Successfully created progress history document with ID:', docRef.id);
+  } catch (error) {
+    console.error('Error saving progress history:', error);
+    throw error;
+  }
+};
+
+// Add function to update goal target
+export const updateGoalTarget = async (
+  userId: string,
+  goalId: string,
+  targetName: string,
+  currentValue: number
+): Promise<void> => {
+  try {
+    const goalRef = doc(db, 'users', userId, 'goals', goalId);
+    const goalDoc = await getDoc(goalRef);
+    
+    if (!goalDoc.exists()) {
+      throw new Error('Goal document does not exist');
+    }
+
+    const goalData = goalDoc.data();
+    const updatedTargets = goalData.targets.map((target: any) => {
+      if (target.name === targetName) {
+        return {
+          ...target,
+          currentValue: currentValue.toString()
+        };
+      }
+      return target;
+    });
+
+    await updateDoc(goalRef, {
+      targets: updatedTargets,
+      updatedAt: Timestamp.now()
+    });
+  } catch (error) {
+    console.error('Error updating goal target:', error);
+    throw error;
+  }
+};
+
+// Get progress history for a goal
+export async function getProgressHistory(goalId: string, userId: string): Promise<ProgressHistory[]> {
+  try {
+    console.log('Getting progress history for goal:', goalId);
+    
+    // Use collection group query to get all progress history entries
+    const progressHistoryRef = collectionGroup(db, 'progress_history');
+    
+    // Query for progress history entries for this goal and user
+    const q = query(
+      progressHistoryRef,
+      where('goalId', '==', goalId),
+      where('userId', '==', userId),
+      orderBy('timestamp', 'desc')
+    );
+
+    const querySnapshot = await getDocs(q);
+    const progressHistory: ProgressHistory[] = [];
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      progressHistory.push({
+        id: doc.id,
+        goalId: data.goalId,
+        userId: data.userId,
+        targetName: data.targetName,
+        value: data.value,
+        currentValue: data.currentValue,
+        photoUrls: data.photoUrls || [],
+        reflection: data.reflection || '',
+        timestamp: data.timestamp instanceof Timestamp ? data.timestamp.toDate() : new Date(data.timestamp),
+        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
+        updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt)
+      });
+    });
+
+    console.log('Retrieved progress history:', progressHistory);
+    return progressHistory;
+  } catch (error) {
+    console.error('Error getting progress history:', error);
+    throw error;
   }
 } 

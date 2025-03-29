@@ -37,10 +37,10 @@ export default function NewTemplatePage() {
     description: "",
     category: "",
     price: 0,
+    fields: [],
     isActive: true,
     isPublic: true,
     features: [],
-    prompts: [],
     tags: [],
     settings: {
       allowCustomization: true,

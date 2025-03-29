@@ -36,11 +36,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
+interface Product {
+  id: number;
+  name: string;
+  brand: string;
+  type: string;
+  ingredients: string;
+  keyIngredients: string[];
+  notes: string;
+}
+
 export default function CurlyHairJournalSetupPage() {
   const [activeTab, setActiveTab] = useState("products")
-  const [products, setProducts] = useState([])
+  const [products, setProducts] = useState<Product[]>([])
   const [showAddProduct, setShowAddProduct] = useState(false)
-  const [newProduct, setNewProduct] = useState({
+  const [newProduct, setNewProduct] = useState<Omit<Product, 'id'>>({
     name: "",
     brand: "",
     type: "",
@@ -70,26 +80,17 @@ export default function CurlyHairJournalSetupPage() {
 
   // Common ingredients for suggestion
   const commonIngredients = [
-    "Aloe Vera",
-    "Argan Oil",
-    "Avocado Oil",
-    "Behentrimonium Chloride",
-    "Butters (Shea, Cocoa, Mango)",
-    "Castor Oil",
-    "Cetearyl Alcohol",
-    "Coconut Oil",
-    "Dimethicone",
-    "Glycerin",
-    "Hydrolyzed Proteins",
-    "Jojoba Oil",
-    "Panthenol",
-    "Polyquaternium",
-    "Silicones",
-    "Sodium Laureth Sulfate",
     "Sodium Lauryl Sulfate",
+    "Sodium Laureth Sulfate",
+    "Ammonium Lauryl Sulfate",
+    "Ammonium Laureth Sulfate",
   ]
 
-  // Add proper checks for browser APIs and fetch requests
+  const findCommonIngredients = (ingredients: string): string[] => {
+    return commonIngredients.filter((ingredient: string) => 
+      ingredients.toLowerCase().includes(ingredient.toLowerCase())
+    );
+  };
 
   // At the beginning of the component, add this check
   const isBrowser = typeof window !== "undefined"

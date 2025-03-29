@@ -53,8 +53,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { getUserJournals, getJournalEntries, deleteJournalEntry } from "@/lib/firebase/db"
-import { Journal, JournalEntry } from "@/lib/firebase/types"
+import { getUserJournals, getJournalEntries, deleteJournalEntry, getUserGoals } from "@/lib/firebase/db"
+import { Journal, JournalEntry, Goal } from "@/lib/firebase/types"
 import { useAuth } from "@/lib/firebase/auth"
 import { createJournal } from "@/lib/firebase/db"
 
@@ -68,6 +68,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastFetch, setLastFetch] = useState<number>(0);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes in milliseconds
   const [stats, setStats] = useState({
     currentStreak: 0,
@@ -147,6 +148,12 @@ export default function DashboardPage() {
       const userJournals = await getUserJournals(user.uid);
       setJournals(userJournals);
 
+      // Load goals
+      console.log('Loading goals for user:', user.uid);
+      const userGoals = await getUserGoals(user.uid);
+      console.log('Goals loaded:', userGoals);
+      setGoals(userGoals);
+
       // Only try to load entries if we have journals
       if (userJournals.length > 0) {
         try {
@@ -193,6 +200,12 @@ export default function DashboardPage() {
       // Load journals
       const userJournals = await getUserJournals(user.uid)
       setJournals(userJournals)
+      
+      // Load goals
+      console.log('Loading goals in loadDashboardData');
+      const userGoals = await getUserGoals(user.uid);
+      console.log('Goals loaded in loadDashboardData:', userGoals);
+      setGoals(userGoals);
       
       // Load entries
       const journalEntries = await getJournalEntries(user.uid, journalId)
@@ -373,6 +386,7 @@ export default function DashboardPage() {
   }
 
   console.log('Rendering main content');
+  console.log('Current goals state:', goals);
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background px-6">
@@ -507,6 +521,38 @@ export default function DashboardPage() {
                 </div>
               </CardContent>
             </Card>
+          </div>
+
+          {/* Goal Progress Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                Goal Progress
+              </h2>
+              <Button variant="ghost" size="sm" className="text-blue-500" asChild>
+                <Link href="/goals">View All Goals</Link>
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {goals.map((goal) => (
+                <Card key={goal.id}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-medium">{goal.title}</h3>
+                      <div className="text-sm text-muted-foreground">{goal.category}</div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span>Progress: {goal.progress} / {goal.targets[0].value} {goal.targets[0].unit}</span>
+                        <span>{Math.round((Number(goal.progress) / Number(goal.targets[0].value)) * 100)}%</span>
+                      </div>
+                      <Progress value={(Number(goal.progress) / Number(goal.targets[0].value)) * 100} />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
 
           {/* Main Content Grid */}

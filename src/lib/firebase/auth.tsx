@@ -43,7 +43,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             profile = await createUserProfile(user.uid, user.email || '', 'user')
           }
           setUserProfile(profile)
-          Cookies.set('auth', 'true', { expires: 7 })
+          Cookies.set('auth', 'true', { 
+            expires: 7,
+            path: '/',
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production'
+          })
         } catch (error) {
           console.error('Error loading user profile:', error)
         }
