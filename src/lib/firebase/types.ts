@@ -67,35 +67,34 @@ export interface JournalEntry {
   relatedGoals?: string[];
 }
 
+export interface JournalType {
+  id: string;
+  name: string;
+  description: string;
+  fields: MarketplaceTemplateField[];
+  prompts: string[];
+  icon?: string;
+  color?: string;
+}
+
 export interface MarketplaceTemplate {
   id: string;
   name: string;
   description: string;
   category: string;
   price: number;
-  isActive: boolean;
-  isPublic: boolean;
   features: string[];
   tags: string[];
+  journalTypes: JournalType[];
+  settings: {
+    active: boolean;
+    public: boolean;
+    allowCustomization: boolean;
+    maxEntries: number;
+    requireApproval: boolean;
+  };
   createdAt: Date;
   updatedAt: Date;
-  users?: number;
-  rating?: number;
-  settings: {
-    allowCustomization: boolean;
-    requireApproval: boolean;
-    maxEntries: number;
-  };
-  fields: {
-    id: string;
-    name: string;
-    label: string;
-    type: string;
-    required: boolean;
-    options?: string[];
-    placeholder?: string;
-    description?: string;
-  }[];
 }
 
 export interface UserSubscription {
@@ -123,6 +122,8 @@ export type Target = {
   unitSystem: "metric" | "imperial";
   targetDate?: string;
   direction: 'min' | 'max';
+  secondaryValue?: string;
+  secondaryUnit?: string;
 };
 
 export type Goal = {
@@ -183,4 +184,44 @@ export interface ProgressHistory {
   timestamp: Date;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface MarketplaceTemplateField {
+  id: string;
+  name: string;
+  label: string;
+  type: string;
+  required: boolean;
+  options?: string[];
+  placeholder?: string;
+  description?: string;
+  allowCustomOptions?: boolean;
+  customOptions?: string[];
+}
+
+export interface Affirmation {
+  id: string;
+  text: string;
+  category: AffirmationCategory;
+}
+
+export type AffirmationCategory = 
+  | "self-discovery"
+  | "creativity"
+  | "gratitude"
+  | "reflection"
+  | "growth"
+  | "money"
+  | "nature"
+  | "confidence"
+  | "relationships"
+  | "health"
+  | "productivity"
+  | "forgiveness";
+
+export interface UserAffirmation {
+  userId: string;
+  journalTypeId: string;
+  lastShownDate: Date;
+  affirmationId: string;
 } 

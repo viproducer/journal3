@@ -19,6 +19,11 @@ interface Metric {
   name: string
   value: string
   unit: string
+  unitType: string
+  unitSystem: "metric" | "imperial"
+  secondaryValue?: string
+  secondaryUnit?: string
+  notes?: string
 }
 
 interface TargetProgress {
@@ -28,7 +33,19 @@ interface TargetProgress {
   notes: string
 }
 
-export default function TrackingLogsForm() {
+interface TrackingLogsFormProps {
+  onSubmit: (data: {
+    title: string
+    content: string
+    trackingType: TrackingType
+    isGoalTracking: boolean
+    linkedGoalId: string
+    metrics: Metric[]
+    targetProgress: TargetProgress[]
+  }) => Promise<void>
+}
+
+export default function TrackingLogsForm({ onSubmit }: TrackingLogsFormProps) {
   const { user } = useAuth()
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
@@ -36,7 +53,7 @@ export default function TrackingLogsForm() {
   const [isGoalTracking, setIsGoalTracking] = useState(false)
   const [linkedGoalId, setLinkedGoalId] = useState("")
   const [goals, setGoals] = useState<Goal[]>([])
-  const [metrics, setMetrics] = useState<Metric[]>([{ name: "", value: "", unit: "" }])
+  const [metrics, setMetrics] = useState<Metric[]>([{ name: "", value: "", unit: "", unitType: "count", unitSystem: "metric" }])
   const [targetProgress, setTargetProgress] = useState<TargetProgress[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -65,7 +82,16 @@ export default function TrackingLogsForm() {
   const selectedGoal = goals.find(goal => goal.id === linkedGoalId)
 
   const addMetric = () => {
-    setMetrics([...metrics, { name: "", value: "", unit: "" }])
+    setMetrics([...metrics, { 
+      name: "", 
+      value: "", 
+      unit: "", 
+      unitType: "count",
+      unitSystem: "metric",
+      secondaryValue: "", 
+      secondaryUnit: "", 
+      notes: "" 
+    }])
   }
 
   const removeMetric = (index: number) => {
@@ -76,7 +102,10 @@ export default function TrackingLogsForm() {
 
   const updateMetric = (index: number, field: keyof Metric, value: string) => {
     const newMetrics = [...metrics]
-    newMetrics[index][field] = value
+    newMetrics[index] = {
+      ...newMetrics[index],
+      [field]: value
+    }
     setMetrics(newMetrics)
   }
 
@@ -107,15 +136,14 @@ export default function TrackingLogsForm() {
         updatedAt: new Date()
       }
 
-      // TODO: Save entry to database
-      console.log("Entry data:", entryData)
+      await onSubmit(entryData)
     } catch (error) {
       console.error("Error saving entry:", error)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="space-y-6">
       <div className="space-y-3">
         <Label htmlFor="title">Title</Label>
         <Input
@@ -203,20 +231,19 @@ export default function TrackingLogsForm() {
               <div className="space-y-4">
                 <Label>Progress Updates</Label>
                 {selectedGoal.targets?.map((target) => (
-                  <div key={target.name} className="space-y-2 p-3 border rounded-md">
-                    <div className="flex justify-between items-center">
+                  <div key={target.name} className="space-y-4 border rounded-lg p-4">
+                    <div className="flex items-center justify-between">
                       <h4 className="font-medium">{target.name}</h4>
                       <span className="text-sm text-muted-foreground">
                         Target: {target.value} {target.unit} per {target.period}
                         {target.secondaryValue && ` (${target.secondaryValue} ${target.secondaryUnit})`}
                       </span>
                     </div>
-                    
+
+                    {/* First Row: Current Value, Secondary Value */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <Label htmlFor={`progress_${target.name}`} className="text-xs">
-                          Current Value
-                        </Label>
+                        <Label htmlFor={`progress_${target.name}`}>Current Value</Label>
                         <Input
                           id={`progress_${target.name}`}
                           name={`progress_${target.name}`}
@@ -228,9 +255,7 @@ export default function TrackingLogsForm() {
                       </div>
                       {target.secondaryValue && (
                         <div className="space-y-1">
-                          <Label htmlFor={`secondary_progress_${target.name}`} className="text-xs">
-                            Secondary Value
-                          </Label>
+                          <Label htmlFor={`secondary_progress_${target.name}`}>Secondary Value</Label>
                           <Input
                             id={`secondary_progress_${target.name}`}
                             name={`secondary_progress_${target.name}`}
@@ -242,16 +267,31 @@ export default function TrackingLogsForm() {
                         </div>
                       )}
                     </div>
+
+                    {/* Second Row: Notes */}
                     <div className="space-y-1">
-                      <Label htmlFor={`notes_${target.name}`} className="text-xs">
-                        Notes
-                      </Label>
-                      <Input
+                      <Label htmlFor={`notes_${target.name}`}>Notes</Label>
+                      <Textarea
                         id={`notes_${target.name}`}
                         name={`notes_${target.name}`}
                         placeholder="Add notes about your progress"
                         value={targetProgress.find(p => p.targetId === target.name)?.notes || ""}
                         onChange={(e) => updateTargetProgress(target.name, "notes", e.target.value)}
+                        className="min-h-[80px]"
+                      />
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Progress</Label>
+                        <span className="text-sm text-muted-foreground">
+                          {target.currentValue} / {target.value} {target.unit}
+                        </span>
+                      </div>
+                      <Progress 
+                        value={(Number(target.currentValue) / Number(target.value)) * 100} 
+                        className="h-2"
                       />
                     </div>
                   </div>
@@ -269,72 +309,128 @@ export default function TrackingLogsForm() {
           )}
         </div>
       ) : (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label>Metrics</Label>
-            <Button type="button" variant="outline" size="sm" onClick={addMetric}>
-              <Plus className="mr-1 h-3 w-3" /> Add Metric
-            </Button>
-          </div>
-
-          <div className="space-y-3">
-            {metrics.map((metric, index) => (
-              <div key={index} className="grid grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor={`metricName${index}`} className="text-xs">
-                    Name
-                  </Label>
-                  <Input
-                    id={`metricName${index}`}
-                    name={`metricName${index}`}
-                    placeholder="e.g., Steps, Calories"
-                    value={metric.name}
-                    onChange={(e) => updateMetric(index, "name", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor={`metricValue${index}`} className="text-xs">
-                    Value
-                  </Label>
-                  <Input
-                    id={`metricValue${index}`}
-                    name={`metricValue${index}`}
-                    type="number"
-                    placeholder="Enter value"
-                    value={metric.value}
-                    onChange={(e) => updateMetric(index, "value", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor={`metricUnit${index}`} className="text-xs">
-                    Unit
-                  </Label>
-                  <Input
-                    id={`metricUnit${index}`}
-                    name={`metricUnit${index}`}
-                    placeholder="e.g., steps, kcal"
-                    value={metric.unit}
-                    onChange={(e) => updateMetric(index, "unit", e.target.value)}
-                  />
-                </div>
+        <div className="space-y-4">
+          {metrics.map((metric, index) => (
+            <div key={index} className="space-y-2 p-4 border rounded-md">
+              <div className="flex justify-between items-center">
+                <h4 className="font-medium">Metric {index + 1}</h4>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   onClick={() => removeMetric(index)}
-                  disabled={metrics.length === 1}
-                  className="col-span-3"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
-            ))}
-          </div>
+              
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <Label>Metric Name</Label>
+                  <Input
+                    value={metric.name}
+                    onChange={(e) => updateMetric(index, "name", e.target.value)}
+                    placeholder="e.g., Steps, Water Intake"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Value</Label>
+                    <Input
+                      type="number"
+                      value={metric.value}
+                      onChange={(e) => updateMetric(index, "value", e.target.value)}
+                      placeholder="Enter value"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Unit Type</Label>
+                    <Select 
+                      value={metric.unitType} 
+                      onValueChange={(value) => updateMetric(index, "unitType", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select unit type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="count">Count</SelectItem>
+                        <SelectItem value="distance">Distance</SelectItem>
+                        <SelectItem value="time">Time</SelectItem>
+                        <SelectItem value="weight">Weight</SelectItem>
+                        <SelectItem value="volume">Volume</SelectItem>
+                        <SelectItem value="percentage">Percentage</SelectItem>
+                        <SelectItem value="money">Money</SelectItem>
+                        <SelectItem value="custom">Custom</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Unit</Label>
+                    <Input
+                      value={metric.unit}
+                      onChange={(e) => updateMetric(index, "unit", e.target.value)}
+                      placeholder="e.g., steps, ml"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Unit System</Label>
+                    <Select 
+                      value={metric.unitSystem} 
+                      onValueChange={(value: "metric" | "imperial") => updateMetric(index, "unitSystem", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select unit system" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="metric">Metric</SelectItem>
+                        <SelectItem value="imperial">Imperial</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Secondary Value (Optional)</Label>
+                    <Input
+                      type="number"
+                      value={metric.secondaryValue || ""}
+                      onChange={(e) => updateMetric(index, "secondaryValue", e.target.value)}
+                      placeholder="Enter secondary value"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Secondary Unit (Optional)</Label>
+                    <Input
+                      value={metric.secondaryUnit || ""}
+                      onChange={(e) => updateMetric(index, "secondaryUnit", e.target.value)}
+                      placeholder="e.g., calories, minutes"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Notes (Optional)</Label>
+                  <Input
+                    value={metric.notes || ""}
+                    onChange={(e) => updateMetric(index, "notes", e.target.value)}
+                    placeholder="Add notes about this metric"
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+          <Button type="button" variant="outline" onClick={addMetric}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Metric
+          </Button>
         </div>
       )}
-
-      <Button type="submit">Save Entry</Button>
-    </form>
+    </div>
   )
 }
 
