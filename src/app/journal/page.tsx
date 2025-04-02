@@ -54,13 +54,24 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { getUserJournals, getJournalEntries, deleteJournalEntry, getUserGoals } from "@/lib/firebase/db"
-import { Journal, JournalEntry, Goal } from "@/lib/firebase/types"
+import { getUserJournals, getJournalEntries, deleteJournalEntry, getUserGoals, getProgressHistory } from "@/lib/firebase/db"
+import { Journal, JournalEntry, Goal, ProgressHistory } from "@/lib/firebase/types"
 import { useAuth } from "@/lib/firebase/auth"
 import { createJournal } from "@/lib/firebase/db"
 import DailyAffirmation from "@/components/DailyAffirmation"
 import { Navigation } from "@/components/Navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+// Helper function to calculate median
+function calculateMedian(numbers: number[]): number {
+  if (numbers.length === 0) return 0;
+  const sorted = [...numbers].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return (sorted[middle - 1] + sorted[middle]) / 2;
+  }
+  return sorted[middle];
+}
 
 export default function DashboardPage() {
   console.log('JournalPage render start');
@@ -74,6 +85,7 @@ export default function DashboardPage() {
   const [lastFetch, setLastFetch] = useState<number>(0);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [showActivityOverview, setShowActivityOverview] = useState(false);
+  const [trackingUpdates, setTrackingUpdates] = useState<Record<string, ProgressHistory[]>>({});
   const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes in milliseconds
   const [stats, setStats] = useState({
     currentStreak: 0,
@@ -333,6 +345,32 @@ export default function DashboardPage() {
     }
   }, [user])
 
+  // Load progress history for all goals
+  const loadProgressHistory = async () => {
+    try {
+      if (!user) return;
+      
+      const updatesByGoal: Record<string, ProgressHistory[]> = {};
+      
+      // Load progress history for each goal
+      for (const goal of goals) {
+        const history = await getProgressHistory(goal.id!, user.uid);
+        updatesByGoal[goal.id!] = history;
+      }
+      
+      setTrackingUpdates(updatesByGoal);
+    } catch (error) {
+      console.error('Error loading progress history:', error);
+    }
+  };
+
+  // Add useEffect to load progress history when goals change
+  useEffect(() => {
+    if (user && goals.length > 0) {
+      loadProgressHistory();
+    }
+  }, [user, goals]);
+
   // Helper function to get icon component based on category
   function getIconForCategory(category: string | undefined): ReactNode {
     switch (category) {
@@ -590,9 +628,13 @@ export default function DashboardPage() {
                       <div className="text-2xl font-bold">
                         {goals.length > 0 
                           ? `${goals.filter(g => {
-                              const progress = Number(g.progress || 0);
-                              const target = Number(g.targets[0]?.value || 0);
-                              return progress >= target && target > 0;
+                              // Calculate overall progress across all targets
+                              return g.targets?.every(target => {
+                                const progress = Number(target.currentValue || 0);
+                                const targetValue = Number(target.value || 0);
+                                // Only count targets that have a valid value
+                                return targetValue === 0 || (targetValue > 0 && progress >= targetValue);
+                              });
                             }).length}/${goals.length}`
                           : "0/0"}
                       </div>
@@ -622,11 +664,47 @@ export default function DashboardPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {goals.map((goal) => {
-                const progress = Number(goal.progress || 0);
-                const target = Number(goal.targets[0]?.value || 0);
-                const percentage = target > 0 ? Math.min((progress / target) * 100, 100) : 0;
-                const isCompleted = progress >= target && target > 0;
-                
+                // Calculate progress for each target using tracking updates
+                const allProgresses = goal.targets.map(target => {
+                  const targetUpdates = trackingUpdates[goal.id!]?.filter(update => update.targetName === target.name) || [];
+                  // Sort updates by timestamp in descending order (newest first)
+                  const sortedUpdates = [...targetUpdates].sort((a, b) => 
+                    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                  );
+                  const latestUpdate = sortedUpdates[0]; // Get the first (most recent) update
+                  const current = latestUpdate ? Number(latestUpdate.value) : Number(target.currentValue);
+                  const targetValue = Number(target.value);
+                  const startValue = Number(target.startValue);
+                  
+                  if (target.direction === 'min') {
+                    const totalImprovement = startValue - targetValue;
+                    const currentImprovement = startValue - current;
+                    return Math.min(100, Math.max(0, (currentImprovement / totalImprovement) * 100));
+                  } else {
+                    return Math.min(100, Math.max(0, (current / targetValue) * 100));
+                  }
+                });
+
+                // Calculate overall progress as median
+                const overallProgress = calculateMedian(allProgresses);
+
+                // Check if all targets are met
+                const isCompleted = goal.targets.every(target => {
+                  const targetUpdates = trackingUpdates[goal.id!]?.filter(update => update.targetName === target.name) || [];
+                  const sortedUpdates = [...targetUpdates].sort((a, b) => 
+                    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                  );
+                  const latestUpdate = sortedUpdates[0];
+                  const current = latestUpdate ? Number(latestUpdate.value) : Number(target.currentValue);
+                  const targetValue = Number(target.value);
+                  
+                  if (target.direction === 'min') {
+                    return current <= targetValue;
+                  } else {
+                    return current >= targetValue;
+                  }
+                });
+
                 return (
                   <Card key={goal.id} className={isCompleted ? "bg-green-50" : ""}>
                     <CardContent className="p-4">
@@ -641,15 +719,18 @@ export default function DashboardPage() {
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
-                          <span>Progress: {progress} / {target} {goal.targets[0]?.unit || ''}</span>
+                          <span>Overall Progress</span>
                           <span className={isCompleted ? "text-green-500 font-medium" : ""}>
-                            {Math.round(percentage)}%
+                            {Math.round(overallProgress)}%
                           </span>
                         </div>
                         <Progress 
-                          value={percentage} 
+                          value={overallProgress} 
                           className={isCompleted ? "bg-green-100" : ""}
                         />
+                        <p className="text-sm text-muted-foreground mt-2">
+                          {goal.description || "No description provided"}
+                        </p>
                       </div>
                     </CardContent>
                   </Card>
