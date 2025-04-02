@@ -117,9 +117,6 @@ export default function CategoryFormsPage() {
           <Button variant="ghost" size="sm" asChild>
             <Link href="/journal">Journal</Link>
           </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/affirmations">Affirmations</Link>
-          </Button>
         </nav>
       </header>
       <main className="flex-1 p-6 md:p-8 lg:p-10">

@@ -217,7 +217,17 @@ export type AffirmationCategory =
   | "relationships"
   | "health"
   | "productivity"
-  | "forgiveness";
+  | "forgiveness"
+  | "abundance"
+  | "peace"
+  | "strength"
+  | "joy"
+  | "purpose"
+  | "wisdom"
+  | "balance"
+  | "love"
+  | "success"
+  | "freedom";
 
 export interface UserAffirmation {
   userId: string;

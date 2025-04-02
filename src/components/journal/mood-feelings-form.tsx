@@ -38,6 +38,17 @@ export default function MoodFeelingsForm() {
 
   return (
     <div className="space-y-6">
+      <input type="hidden" name="category" value="mood-feelings" />
+      <input type="hidden" name="type" value="mood" />
+      <input type="hidden" name="metadata" value={JSON.stringify({
+        moodLevel: moodLevel[0],
+        primaryEmotion,
+        healthyResponse,
+        triggers,
+        physical,
+        reflection
+      })} />
+      
       <div className="space-y-3">
         <Label htmlFor="title">Title</Label>
         <Input

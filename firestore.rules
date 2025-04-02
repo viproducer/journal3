@@ -9,11 +9,42 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        request.auth.token.role == 'admin';
     }
 
     function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isJournalOwner(journalData) {
+      return isAuthenticated() && request.auth.uid == journalData.userId;
+    }
+
+    function isGoalOwner(goalId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/goals/$(goalId)) &&
+        get(/databases/$(database)/documents/goals/$(goalId)).data.userId == request.auth.uid;
+    }
+
+    function isEntryOwner(entryId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/entries/$(entryId)) &&
+        get(/databases/$(database)/documents/entries/$(entryId)).data.userId == request.auth.uid;
+    }
+
+    function isTemplateOwner(templateId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/templates/$(templateId)) &&
+        get(/databases/$(database)/documents/templates/$(templateId)).data.userId == request.auth.uid;
+    }
+
+    function isMarketplaceTemplateOwner(templateId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/marketplaceTemplates/$(templateId)) &&
+        get(/databases/$(database)/documents/marketplaceTemplates/$(templateId)).data.userId == request.auth.uid;
+    }
+
+    function isUserAffirmationOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
@@ -22,7 +53,7 @@ service cloud.firestore {
     }
 
     function hasRole(role) {
-      return isAuthenticated() && getUserData().role == role;
+      return isAuthenticated() && request.auth.token.role == role;
     }
 
     function isCreator() {
@@ -53,111 +84,58 @@ service cloud.firestore {
              (data.reflection == null || data.reflection is string);
     }
 
-    // User document rules
+    // Collection-level rules
     match /users/{userId} {
-      allow read: if isOwner(userId);
-      allow create: if isOwner(userId) && 
-        request.resource.data.id == userId &&
-        request.resource.data.email is string &&
-        request.resource.data.role is string &&
-        request.resource.data.createdAt is timestamp &&
-        request.resource.data.updatedAt is timestamp;
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow write: if isAuthenticated() && (isOwner(userId) || isAdmin());
 
-      // Goals subcollection rules
-      match /goals/{goalId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId) && 
-          request.resource.data.userId == userId &&
-          request.resource.data.title is string &&
-          request.resource.data.description is string &&
-          request.resource.data.category is string &&
-          request.resource.data.type is string &&
-          request.resource.data.targets is list &&
-          request.resource.data.targets.size() > 0 &&
-          request.resource.data.createdAt is timestamp &&
-          request.resource.data.updatedAt is timestamp;
-        allow update: if isOwner(userId);
-        allow delete: if isOwner(userId);
-
-        // Progress history subcollection rules
-        match /progress_history/{progressId} {
-          allow read: if isOwner(userId);
-          allow create: if isOwner(userId) && isValidProgressData();
-          allow update: if isOwner(userId) && isValidProgressData();
-          allow delete: if isOwner(userId);
-        }
-      }
-
-      // Journals subcollection rules
+      // User's journals subcollection
       match /journals/{journalId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId) && 
-          request.resource.data.userId == userId &&
-          request.resource.data.name is string &&
-          request.resource.data.description is string &&
-          request.resource.data.createdAt is timestamp &&
-          request.resource.data.updatedAt is timestamp;
-        allow update: if isOwner(userId);
-        allow delete: if isOwner(userId);
+        allow read, write: if isAuthenticated() && (isOwner(userId) || isAdmin());
 
-        // Entries subcollection rules
+        // Journal entries subcollection
         match /entries/{entryId} {
-          allow read: if isOwner(userId);
-          allow create: if isOwner(userId) && 
-            request.resource.data.userId == userId &&
-            request.resource.data.journalId == journalId &&
-            request.resource.data.content is string &&
-            request.resource.data.createdAt is timestamp &&
-            request.resource.data.updatedAt is timestamp;
-          allow update: if isOwner(userId);
-          allow delete: if isOwner(userId);
+          allow read, write: if isAuthenticated() && (isOwner(userId) || isAdmin());
         }
       }
+
+      // User's goals subcollection
+      match /goals/{goalId} {
+        allow read, write: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      }
+    }
+
+    // User affirmations collection
+    match /userAffirmations/{docId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+
+    // Templates collection
+    match /templates/{templateId} {
+      allow read: if true;
+      allow create: if isAdmin() || isCreator();
+      allow update: if isAdmin() || isCreator();
+      allow delete: if isAdmin();
+    }
+
+    // Marketplace templates collection
+    match /marketplaceTemplates/{templateId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isMarketplaceTemplateOwner(templateId);
     }
 
     // Collection group rules for progress_history
     match /{path=**}/progress_history/{progressId} {
       allow read: if isAuthenticated() && 
-        request.auth.uid == resource.data.userId;
-      allow create: if isAuthenticated() && 
-        request.auth.uid == request.resource.data.userId &&
-        isValidProgressData();
-      allow update: if isAuthenticated() && 
-        request.auth.uid == resource.data.userId &&
-        isValidProgressData();
-      allow delete: if isAuthenticated() && 
-        request.auth.uid == resource.data.userId;
-    }
-
-    // Root collections
-    match /journals/{journalId} {
-      allow read: if isAuthenticated() && 
-        request.auth.uid == resource.data.userId;
-      allow write: if false; // All writes must go through user subcollection
-    }
-
-    match /entries/{entryId} {
-      allow read: if isAuthenticated() && 
-        request.auth.uid == resource.data.userId;
-      allow write: if false; // All writes must go through journal subcollection
-    }
-
-    match /templates/{templateId} {
-      allow read: if true;
-      allow write: if false;
-    }
-
-    match /subscriptions/{subscriptionId} {
-      allow read: if isAuthenticated() && 
-        request.auth.uid == resource.data.userId;
+        (request.auth.uid == resource.data.userId || isAdmin());
       allow create: if isAuthenticated() && 
         request.auth.uid == request.resource.data.userId;
       allow update: if isAuthenticated() && 
-        request.auth.uid == resource.data.userId;
+        (request.auth.uid == resource.data.userId || isAdmin());
       allow delete: if isAuthenticated() && 
-        request.auth.uid == resource.data.userId;
+        (request.auth.uid == resource.data.userId || isAdmin());
     }
   }
 } 

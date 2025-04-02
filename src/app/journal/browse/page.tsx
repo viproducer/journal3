@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/firebase/auth"
-import { getJournalEntries, deleteJournalEntry } from "@/lib/firebase/db"
+import { getJournalEntries, deleteJournalEntry, getUserJournals } from "@/lib/firebase/db"
 import { JournalEntry } from "@/lib/firebase/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -141,18 +141,36 @@ export default function BrowseJournalPage() {
     const loadEntries = async () => {
       try {
         setLoading(true)
-        const journalId = localStorage.getItem('currentJournalId') || 'default'
-        const fetchedEntries = await getJournalEntries(user.uid, journalId)
-        setEntries(fetchedEntries)
+        const userJournals = await getUserJournals(user.uid)
+        
+        // Load entries from all journals
+        const allEntries: JournalEntry[] = []
+        for (const journal of userJournals) {
+          try {
+            const journalEntries = await getJournalEntries(user.uid, journal.id!)
+            allEntries.push(...journalEntries)
+          } catch (entriesError) {
+            console.warn(`Could not load entries for journal ${journal.id}:`, entriesError)
+          }
+        }
+
+        // Sort entries by date (newest first)
+        allEntries.sort((a, b) => {
+          const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(0)
+          const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(0)
+          return dateB.getTime() - dateA.getTime()
+        })
+        
+        setEntries(allEntries)
         
         // Extract all unique tags
         const tags = new Set<string>()
-        fetchedEntries.forEach(entry => {
+        allEntries.forEach(entry => {
           entry.tags?.forEach(tag => tags.add(tag))
         })
         setAllTags(Array.from(tags))
         
-        setFilteredEntries(fetchedEntries)
+        setFilteredEntries(allEntries)
       } catch (error) {
         console.error("Error loading entries:", error)
       } finally {
@@ -163,23 +181,41 @@ export default function BrowseJournalPage() {
     loadEntries()
   }, [user])
 
-  // Add loadEntries as a function that can be called from anywhere
+  // Update refreshEntries to match the new loading logic
   const refreshEntries = async () => {
     if (!user) return
     try {
       setLoading(true)
-      const journalId = localStorage.getItem('currentJournalId') || 'default'
-      const fetchedEntries = await getJournalEntries(user.uid, journalId)
-      setEntries(fetchedEntries)
+      const userJournals = await getUserJournals(user.uid)
+      
+      // Load entries from all journals
+      const allEntries: JournalEntry[] = []
+      for (const journal of userJournals) {
+        try {
+          const journalEntries = await getJournalEntries(user.uid, journal.id!)
+          allEntries.push(...journalEntries)
+        } catch (entriesError) {
+          console.warn(`Could not load entries for journal ${journal.id}:`, entriesError)
+        }
+      }
+
+      // Sort entries by date (newest first)
+      allEntries.sort((a, b) => {
+        const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(0)
+        const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(0)
+        return dateB.getTime() - dateA.getTime()
+      })
+      
+      setEntries(allEntries)
       
       // Extract all unique tags
       const tags = new Set<string>()
-      fetchedEntries.forEach(entry => {
+      allEntries.forEach(entry => {
         entry.tags?.forEach(tag => tags.add(tag))
       })
       setAllTags(Array.from(tags))
       
-      setFilteredEntries(fetchedEntries)
+      setFilteredEntries(allEntries)
     } catch (error) {
       console.error("Error loading entries:", error)
     } finally {
@@ -301,9 +337,6 @@ export default function BrowseJournalPage() {
           </Button>
           <Button variant="ghost" size="sm" asChild>
             <Link href="/goals">Goals</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/affirmations">Affirmations</Link>
           </Button>
           <Button variant="ghost" size="sm" asChild>
             <Link href="/marketplace">Marketplace</Link>

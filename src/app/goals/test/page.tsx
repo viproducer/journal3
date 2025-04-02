@@ -20,31 +20,24 @@ export default function TestGoalsPage() {
       userId: user.uid,
       title: "Test Goal",
       description: "This is a test goal",
-      category: "Health" as const,
-      type: "fitness",
-      targets: [
-        {
-          name: "Push-ups",
-          value: "50",
-          unit: "reps",
-          period: "daily",
-          startValue: "0",
-          currentValue: "0",
-          unitType: "count" as const,
-          unitSystem: "metric" as const,
-          direction: "max" as const
-        }
-      ],
+      category: "Personal Growth",
+      type: "Personal Growth",
+      targets: [{
+        name: "Main Target",
+        value: "10",
+        unit: "items",
+        period: "total"
+      }],
       progress: 0,
-      goalStatement: "I want to do 50 push-ups daily",
-      goalWhy: "To improve upper body strength",
-      nextSteps: "Start with 10 push-ups and gradually increase",
+      goalStatement: "Test goal statement",
+      goalWhy: "To test goal creation",
+      nextSteps: "Test next steps",
       milestones: [],
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
       metadata: {
-        category: "Health" as const,
-        type: "fitness"
+        category: "Personal Growth",
+        type: "Personal Growth"
       }
     }
 

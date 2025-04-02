@@ -236,11 +236,10 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
   }
 
   const handleRemoveOption = (option: string) => {
-    const options = newField.options || [];
     setNewField({
       ...newField,
-      options: options.filter((item) => item !== option),
-    });
+      options: newField.options.filter((item) => item !== option),
+    })
   }
 
   const addFeature = () => {

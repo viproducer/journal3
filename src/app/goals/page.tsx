@@ -26,6 +26,7 @@ import { doc, getDoc, setDoc, collection } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 import { ResponsiveContainer, LineChart, XAxis, YAxis, Tooltip, Line } from "recharts"
 import { format } from "date-fns"
+import { Navigation } from "@/components/Navigation"
 
 const GOAL_CATEGORIES = {
   "Health": [
@@ -297,31 +298,43 @@ const getProgressHistoryForGraph = (
 ): GraphData[] => {
   const progressData: GraphData[] = [];
 
-  // Add initial progress for each target
-  goal.targets.forEach(target => {
+  // Add initial progress for each target and overall
+  const startDate = goal.createdAt instanceof Timestamp 
+    ? goal.createdAt.toDate() 
+    : typeof goal.createdAt === 'string' 
+      ? new Date(goal.createdAt)
+      : goal.createdAt instanceof Date
+        ? goal.createdAt
+        : new Date();
+
+  // Calculate initial progress for each target
+  const targetProgresses = goal.targets.map(target => {
     const startValue = Number(target.startValue);
     const targetValue = Number(target.value);
     
-    let progress = 0;
     if (target.direction === 'min') {
       const totalImprovement = startValue - targetValue;
-      const currentImprovement = startValue - startValue; // At start, no improvement
-      progress = Math.min(100, Math.max(0, (currentImprovement / totalImprovement) * 100));
+      const currentImprovement = startValue - startValue;
+      return Math.min(100, Math.max(0, (currentImprovement / totalImprovement) * 100));
     } else {
-      progress = Math.min(100, Math.max(0, (startValue / targetValue) * 100));
+      return Math.min(100, Math.max(0, (startValue / targetValue) * 100));
     }
+  });
 
+  // Add initial data point for each target
+  goal.targets.forEach((target, index) => {
     progressData.push({
-      date: goal.createdAt instanceof Timestamp 
-        ? goal.createdAt.toDate() 
-        : typeof goal.createdAt === 'string' 
-          ? new Date(goal.createdAt)
-          : goal.createdAt instanceof Date
-            ? goal.createdAt
-            : new Date(),
-      value: progress,
+      date: startDate,
+      value: targetProgresses[index],
       targetName: target.name
     });
+  });
+
+  // Add initial overall progress
+  progressData.push({
+    date: startDate,
+    value: calculateMedian(targetProgresses),
+    targetName: 'Overall'
   });
 
   // Add progress from each history entry
@@ -331,7 +344,7 @@ const getProgressHistoryForGraph = (
 
     const startValue = Number(target.startValue);
     const targetValue = Number(target.value);
-    const currentValue = Number(entry.value); // Use entry.value instead of currentValue
+    const currentValue = Number(entry.value);
     
     let progress = 0;
     if (target.direction === 'min') {
@@ -342,10 +355,44 @@ const getProgressHistoryForGraph = (
       progress = Math.min(100, Math.max(0, (currentValue / targetValue) * 100));
     }
 
+    // Add target-specific progress
     progressData.push({
       date: convertToDate(entry.timestamp),
       value: progress,
       targetName: entry.targetName
+    });
+
+    // Calculate and add overall progress for this timestamp
+    const allTargetProgresses = goal.targets.map(t => {
+      if (t.name === entry.targetName) {
+        return progress;
+      }
+      const targetUpdates = progressHistory
+        .filter(u => u.targetName === t.name && u.timestamp <= entry.timestamp)
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      
+      if (targetUpdates.length === 0) {
+        return Number(t.currentValue);
+      }
+
+      const latestUpdate = targetUpdates[0];
+      const current = Number(latestUpdate.value);
+      const targetValue = Number(t.value);
+      const startValue = Number(t.startValue);
+
+      if (t.direction === 'min') {
+        const totalImprovement = startValue - targetValue;
+        const currentImprovement = startValue - current;
+        return Math.min(100, Math.max(0, (currentImprovement / totalImprovement) * 100));
+      } else {
+        return Math.min(100, Math.max(0, (current / targetValue) * 100));
+      }
+    });
+
+    progressData.push({
+      date: convertToDate(entry.timestamp),
+      value: calculateMedian(allTargetProgresses),
+      targetName: 'Overall'
     });
   });
 
@@ -881,74 +928,46 @@ export default function GoalsPage() {
           <Edit3 className="h-5 w-5" />
           <span>JournalMind</span>
         </Link>
-        <nav className="ml-auto flex gap-2">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal">Dashboard</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal/browse">Journal</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/goals">Goals</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/affirmations">Affirmations</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/marketplace">Marketplace</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin/templates">Admin</Link>
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={handleLogout}
-            className="text-red-500 hover:text-red-600 hover:bg-red-50"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
-        </nav>
+        <Navigation onLogout={handleLogout} />
       </header>
 
       <main className="flex-1 container mx-auto max-w-4xl py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Goals</h1>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => { resetForm(); setIsDialogOpen(true) }}>
-                <Plus className="mr-2 h-4 w-4" />
-                New Goal
-              </Button>
-            </DialogTrigger>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Goals</h1>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={() => { resetForm(); setIsDialogOpen(true) }}>
+              <Plus className="mr-2 h-4 w-4" />
+              New Goal
+            </Button>
+          </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editingGoal ? "Edit Goal" : "Create New Goal"}</DialogTitle>
-                <DialogDescription>
-                  Set a new goal to track your progress
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="title">Title</Label>
-                  <Input
-                    id="title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Enter goal title"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Enter goal description"
-                  />
-                </div>
+            <DialogHeader>
+              <DialogTitle>{editingGoal ? "Edit Goal" : "Create New Goal"}</DialogTitle>
+              <DialogDescription>
+                Set a new goal to track your progress
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="title">Title</Label>
+                <Input
+                  id="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Enter goal title"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Enter goal description"
+                />
+              </div>
 
                 <div className="space-y-4">
                   <div>
@@ -984,42 +1003,42 @@ export default function GoalsPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="category">Category</Label>
+              <div>
+                <Label htmlFor="category">Category</Label>
                     <Select 
                       value={category} 
                       onValueChange={(value: keyof typeof GOAL_CATEGORIES) => setCategory(value)}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.keys(GOAL_CATEGORIES).map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="type">Type</Label>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(GOAL_CATEGORIES).map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="type">Type</Label>
                     <Select 
                       value={type} 
                       onValueChange={(value: string) => setType(value)}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a type" />
-                      </SelectTrigger>
-                      <SelectContent>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a type" />
+                  </SelectTrigger>
+                  <SelectContent>
                         {category && GOAL_CATEGORIES[category]?.map((t) => (
-                          <SelectItem key={t} value={t}>
-                            {t}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
                 </div>
 
                 <div className="space-y-4">
@@ -1044,7 +1063,7 @@ export default function GoalsPage() {
 
                       {/* First Row: Target Name, Unit Type, Current Value, Target Value */}
                       <div className="grid grid-cols-4 gap-4">
-                        <div>
+              <div>
                           <Label htmlFor={`target-name-${index}`}>Target Name</Label>
                           <Input
                             id={`target-name-${index}`}
@@ -1059,23 +1078,23 @@ export default function GoalsPage() {
                             value={target.unit} 
                             onValueChange={(value) => handleTargetChange(index, 'unit', value)}
                           >
-                            <SelectTrigger>
+                  <SelectTrigger>
                               <SelectValue placeholder="Select unit" />
-                            </SelectTrigger>
-                            <SelectContent>
+                  </SelectTrigger>
+                  <SelectContent>
                               {getAvailableUnits().map((u) => (
                                 <SelectItem key={u} value={u}>
                                   {u}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
                         <div>
                           <Label htmlFor={`current-value-${index}`}>Current Value</Label>
-                          <Input
+                  <Input
                             id={`current-value-${index}`}
-                            type="number"
+                    type="number"
                             value={target.currentValue}
                             onChange={(e) => handleTargetChange(index, 'currentValue', e.target.value)}
                             placeholder="Enter current value"
@@ -1089,27 +1108,27 @@ export default function GoalsPage() {
                             type="number"
                             value={target.value}
                             onChange={(e) => handleTargetChange(index, 'value', e.target.value)}
-                            placeholder="Enter target value"
-                            required
-                          />
-                        </div>
+                    placeholder="Enter target value"
+                    required
+                  />
+                </div>
                       </div>
 
                       {/* Second Row: Target Direction */}
                       <div>
                         <Label htmlFor={`target-direction-${index}`}>Target Direction</Label>
-                        <Select 
+                  <Select 
                           value={target.direction} 
                           onValueChange={(value: 'min' | 'max') => handleTargetChange(index, 'direction', value)}
-                        >
-                          <SelectTrigger>
+                  >
+                    <SelectTrigger>
                             <SelectValue placeholder="Select direction" />
-                          </SelectTrigger>
-                          <SelectContent>
+                    </SelectTrigger>
+                    <SelectContent>
                             <SelectItem value="min">Minimum (e.g., running time)</SelectItem>
                             <SelectItem value="max">Maximum (e.g., weight loss)</SelectItem>
-                          </SelectContent>
-                        </Select>
+                    </SelectContent>
+                  </Select>
                         {!isValidDirection(type, target.direction) && (
                           <p className="text-sm text-red-500 mt-1">
                             This direction may not be appropriate for {type} goals
@@ -1120,7 +1139,7 @@ export default function GoalsPage() {
                             ? "Progress increases as you get closer to the target (e.g., running faster)"
                             : "Progress increases as you exceed the target (e.g., running further)"}
                         </p>
-                      </div>
+                </div>
                     </div>
                   ))}
 
@@ -1138,29 +1157,29 @@ export default function GoalsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="period">Period</Label>
-                    <Select 
+                  <Select 
                       value={period} 
                       onValueChange={(value: typeof PERIODS[number]) => setPeriod(value)}
-                    >
-                      <SelectTrigger>
+                  >
+                    <SelectTrigger>
                         <SelectValue placeholder="Select period" />
-                      </SelectTrigger>
-                      <SelectContent>
+                    </SelectTrigger>
+                    <SelectContent>
                         {PERIODS.map((p) => (
                           <SelectItem key={p} value={p}>
                             {p}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+              </div>
+              <div>
                     <Label htmlFor="end-date">Goal End Date</Label>
-                    <Input
+                <Input
                       id="end-date"
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
                       disabled={period !== "End Date"}
                     />
                   </div>
@@ -1186,56 +1205,56 @@ export default function GoalsPage() {
                       Imperial
                     </Button>
                   </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  console.log('Submit button clicked');
+                  handleSubmit();
+                }}
+              >
+                {editingGoal ? "Update Goal" : "Create Goal"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="grid gap-4">
+        {goals.map((goal) => (
+          <Card key={goal.id}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>{goal.title}</CardTitle>
+                  <CardDescription>{goal.category}</CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEdit(goal)}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleDelete(goal.id!)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={() => {
-                    console.log('Submit button clicked');
-                    handleSubmit();
-                  }}
-                >
-                  {editingGoal ? "Update Goal" : "Create Goal"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <div className="grid gap-4">
-          {goals.map((goal) => (
-            <Card key={goal.id}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>{goal.title}</CardTitle>
-                    <CardDescription>{goal.category}</CardDescription>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(goal)}
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDelete(goal.id!)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {goal.description && (
-                  <p className="mb-4 text-sm text-gray-600">{goal.description}</p>
-                )}
+            </CardHeader>
+            <CardContent>
+              {goal.description && (
+                <p className="mb-4 text-sm text-gray-600">{goal.description}</p>
+              )}
                 <div className="space-y-4">
                   {goal.targets.map((target, index) => {
                     // Get the most recent tracking update for this target
@@ -1265,12 +1284,12 @@ export default function GoalsPage() {
 
                     return (
                       <div key={index} className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between text-sm">
                           <span>{target.name}: {current} / {target.value} {target.unit}</span>
                           <span className={isOverTarget ? "text-red-500" : ""}>
                             {Math.round(progress)}%
                           </span>
-                        </div>
+                </div>
                         <div className="relative">
                           <Progress 
                             value={progress} 
@@ -1351,7 +1370,7 @@ export default function GoalsPage() {
                                     if (!value || !value.date) return '';
                                     return format(new Date(value.date), 'MMM d, yyyy');
                                   }}
-                                  formatter={(value) => [`${value}%`, 'Progress']}
+                                  formatter={(value, name) => [`${value}%`, name]}
                                 />
                                 <Line 
                                   type="monotone" 
@@ -1359,7 +1378,21 @@ export default function GoalsPage() {
                                   stroke="#2563eb" 
                                   strokeWidth={2}
                                   dot={{ r: 4 }}
+                                  name="Overall Progress"
+                                  data={getProgressHistoryForGraph(goal, progressHistory).filter(d => d.targetName === 'Overall')}
                                 />
+                                {goal.targets.map((target, index) => (
+                                  <Line
+                                    key={target.name}
+                                    type="monotone"
+                                    dataKey="value"
+                                    stroke={index === 0 ? "#22c55e" : "#f59e0b"}
+                                    strokeWidth={2}
+                                    dot={{ r: 4 }}
+                                    name={`${target.name} (${target.value} ${target.unit})`}
+                                    data={getProgressHistoryForGraph(goal, progressHistory).filter(d => d.targetName === target.name)}
+                                  />
+                                ))}
                               </LineChart>
                             </ResponsiveContainer>
                           </div>
@@ -1412,16 +1445,16 @@ export default function GoalsPage() {
                           <div className="flex items-center justify-between">
                             <h3 className="text-sm font-medium">Progress Photos</h3>
                             {trackingUpdates[goal.id!]?.some(update => update.photoUrls?.length > 0) && (
-                              <Button
-                                variant="outline"
-                                size="sm"
+                  <Button
+                    variant="outline"
+                    size="sm"
                                 onClick={() => {
                                   setSelectedGoal(goal);
                                   setIsGalleryOpen(true);
                                 }}
-                              >
+                  >
                                 View All Photos
-                              </Button>
+                  </Button>
                             )}
                           </div>
                           
@@ -1467,16 +1500,16 @@ export default function GoalsPage() {
                   <div className="flex justify-end">
                     <Dialog open={isTrackingDialogOpen && selectedGoal?.id === goal.id} onOpenChange={setIsTrackingDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
+                  <Button
+                    variant="outline"
+                    size="sm"
                           onClick={() => {
                             setSelectedGoal(goal)
                             setIsTrackingDialogOpen(true)
                           }}
-                        >
+                  >
                           Track Progress
-                        </Button>
+                  </Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
@@ -1492,11 +1525,10 @@ export default function GoalsPage() {
                               <div className="flex items-center gap-2">
                                 <Input
                                   type="number"
-                                  value={currentUpdate[target.name]?.currentValue || target.startValue}
+                                  value={currentUpdate[target.name]?.currentValue || target.currentValue}
                                   onChange={(e) => setCurrentUpdate(prev => ({
                                     ...prev,
                                     [target.name]: {
-                                      ...prev[target.name],
                                       currentValue: Number(e.target.value)
                                     }
                                   }))}
@@ -1504,6 +1536,9 @@ export default function GoalsPage() {
                                   className="flex-1"
                                 />
                                 <span className="text-sm text-gray-500">{target.unit}</span>
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                Target: {target.value} {target.unit}
                               </div>
                             </div>
                           ))}
@@ -1579,35 +1614,42 @@ export default function GoalsPage() {
                           </Button>
                           <Button onClick={async () => {
                             if (!user) return;
-                            const target = goal.targets[0];
+                            
+                            // Update all targets
                             const photoUrls = photoFiles.length > 0 
                               ? await Promise.all(photoFiles.map(file => uploadPhoto(file, user.uid))) 
                               : [];
                             
-                            handleTrackingUpdate(
-                              goal.id!,
-                              target.name,
-                              Number(currentUpdate[target.name]?.currentValue || target.startValue).toString(),
-                              photoUrls,
-                              reflection
+                            // Create an array of promises for each target update
+                            const updatePromises = goal.targets.map(target => 
+                              handleTrackingUpdate(
+                                goal.id!,
+                                target.name,
+                                Number(currentUpdate[target.name]?.currentValue || target.currentValue).toString(),
+                                photoUrls,
+                                reflection
+                              )
                             );
+                            
+                            // Wait for all updates to complete
+                            await Promise.all(updatePromises);
                           }}>
                             Update Progress
                           </Button>
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>
-                  </div>
                 </div>
-              </CardContent>
-              <CardFooter>
-                <div className="flex items-center gap-4 text-sm text-gray-600">
-                  <span>Started: {goal.createdAt ? (goal.createdAt instanceof Timestamp ? goal.createdAt.toDate().toLocaleDateString() : new Date(goal.createdAt).toLocaleDateString()) : 'Not set'}</span>
-                </div>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <div className="flex items-center gap-4 text-sm text-gray-600">
+                <span>Started: {goal.createdAt ? (goal.createdAt instanceof Timestamp ? goal.createdAt.toDate().toLocaleDateString() : new Date(goal.createdAt).toLocaleDateString()) : 'Not set'}</span>
+              </div>
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
 
         {/* Photo Gallery Dialog */}
         <Dialog open={isGalleryOpen} onOpenChange={setIsGalleryOpen}>

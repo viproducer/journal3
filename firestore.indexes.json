@@ -20,10 +20,9 @@
       "collectionGroup": "progress_history",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "goalId", "order": "ASCENDING" },
         { "fieldPath": "userId", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "DESCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
+        { "fieldPath": "goalId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
       ]
     }
   ],

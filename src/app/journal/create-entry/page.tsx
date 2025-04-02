@@ -120,6 +120,92 @@ export default function CreateEntryPage() {
     form.requestSubmit()
   }
 
+  const handleTrackingLogsSubmit = async (data: {
+    title: string
+    content: string
+    trackingType: string
+    isGoalTracking: boolean
+    linkedGoalId: string
+    metrics: any[]
+    targetProgress: any[]
+  }) => {
+    try {
+      setSubmitting(true)
+      setError(null)
+
+      // Get the user's journals
+      const journals = await getUserJournals(user!.uid)
+      if (!journals || journals.length === 0) {
+        // Create a default journal if none exists
+        const defaultJournal = await createJournal({
+          userId: user!.uid,
+          name: "My Journal",
+          description: "My personal journal",
+          isActive: true,
+          isArchived: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          settings: {
+            isPrivate: true,
+            allowComments: false,
+            allowSharing: false
+          }
+        })
+        if (!defaultJournal.id) {
+          throw new Error("Failed to create default journal")
+        }
+        await createEntry({
+          userId: user!.uid,
+          journalId: defaultJournal.id,
+          content: data.content,
+          category: "tracking-logs",
+          type: "tracking",
+          metadata: {
+            title: data.title,
+            trackingType: data.trackingType,
+            isGoalTracking: data.isGoalTracking,
+            linkedGoalId: data.linkedGoalId,
+            metrics: data.metrics,
+            targetProgress: data.targetProgress,
+          },
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+      } else {
+        // Use the first non-archived journal
+        const activeJournal = journals.find(j => !j.isArchived)
+        if (!activeJournal || !activeJournal.id) {
+          throw new Error("No active journal found")
+        }
+        await createEntry({
+          userId: user!.uid,
+          journalId: activeJournal.id,
+          content: data.content,
+          category: "tracking-logs",
+          type: "tracking",
+          metadata: {
+            title: data.title,
+            trackingType: data.trackingType,
+            isGoalTracking: data.isGoalTracking,
+            linkedGoalId: data.linkedGoalId,
+            metrics: data.metrics,
+            targetProgress: data.targetProgress,
+          },
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+      }
+
+      // Redirect to the journal page
+      router.push("/journal")
+    } catch (error) {
+      console.error("Error creating entry:", error)
+      setError("Failed to create entry. Please try again.")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const categories = [
     {
       id: "mood-feelings",
@@ -133,7 +219,7 @@ export default function CreateEntryPage() {
       name: "Tracking & Logs",
       icon: <BarChart2 className="h-5 w-5" />,
       description: "Log and track habits, activities, and metrics with customizable fields.",
-      component: <TrackingLogsForm />,
+      component: <TrackingLogsForm onSubmit={handleTrackingLogsSubmit} />,
     },
     {
       id: "gratitude-reflection",
@@ -201,8 +287,6 @@ export default function CreateEntryPage() {
     try {
       const formData = new FormData(e.currentTarget)
       const content = formData.get('content') as string
-      const category = formData.get('category') as string
-      const type = formData.get('type') as string
       const metadata = JSON.parse(formData.get('metadata') as string || '{}')
 
       // Get or create default journal
@@ -230,10 +314,11 @@ export default function CreateEntryPage() {
         throw new Error('Failed to get or create journal')
       }
 
-      const data = {
+      // Ensure category and type are set correctly
+      const entryData = {
         content,
-        category,
-        type,
+        category: selectedCategory, // Use the selected category from tabs
+        type: selectedCategory, // Use the full category name for type
         userId: user.uid,
         journalId: journal.id,
         createdAt: new Date(),
@@ -241,8 +326,8 @@ export default function CreateEntryPage() {
         metadata
       }
 
-      console.log('Creating entry with data:', data)
-      await createEntry(data)
+      console.log('Creating entry with data:', entryData)
+      await createEntry(entryData)
       router.push('/journal/browse')
     } catch (error) {
       console.error('Error creating entry:', error)
@@ -263,9 +348,6 @@ export default function CreateEntryPage() {
           </Button>
           <Button variant="ghost" size="sm" asChild>
             <Link href="/journal/browse">Journal</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/affirmations">Affirmations</Link>
           </Button>
           <Button variant="ghost" size="sm" asChild>
             <Link href="/marketplace">Marketplace</Link>
@@ -330,6 +412,11 @@ export default function CreateEntryPage() {
                 <CardContent className="p-6">
                   {selectedCategoryData?.component}
                 </CardContent>
+                <CardFooter className="flex justify-end p-6 pt-0">
+                  <Button type="submit" disabled={submitting}>
+                    {submitting ? "Saving..." : "Save Entry"}
+                  </Button>
+                </CardFooter>
               </Card>
             </Tabs>
           </form>

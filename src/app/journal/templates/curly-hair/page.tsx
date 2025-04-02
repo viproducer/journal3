@@ -144,7 +144,7 @@ export default function CurlyHairJournalSetupPage() {
             <Link href="/journal">Journal</Link>
           </Button>
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/affirmations">Affirmations</Link>
+            <Link href="/journal">Affirmations</Link>
           </Button>
           <Button variant="ghost" size="sm" className="bg-primary/10" asChild>
             <Link href="/marketplace">Marketplace</Link>

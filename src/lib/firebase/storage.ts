@@ -1,21 +1,22 @@
-import { storage } from "./config"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { app } from './config';
 
-export async function uploadPhoto(file: File, userId: string): Promise<string> {
+const storage = getStorage(app);
+
+export async function uploadPhoto(file: File, path: string): Promise<string> {
   try {
-    // Create a unique filename using timestamp and original filename
-    const timestamp = Date.now()
-    const filename = `${userId}/${timestamp}-${file.name}`
-    const storageRef = ref(storage, filename)
-
+    // Create a storage reference
+    const storageRef = ref(storage, path);
+    
     // Upload the file
-    await uploadBytes(storageRef, file)
-
+    const snapshot = await uploadBytes(storageRef, file);
+    
     // Get the download URL
-    const downloadURL = await getDownloadURL(storageRef)
-    return downloadURL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    
+    return downloadURL;
   } catch (error) {
-    console.error("Error uploading photo:", error)
-    throw error
+    console.error('Error uploading photo:', error);
+    throw error;
   }
 } 

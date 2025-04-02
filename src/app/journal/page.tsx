@@ -47,6 +47,7 @@ import {
   format,
   subDays
 } from "date-fns"
+import { Timestamp } from 'firebase/firestore'
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -57,6 +58,9 @@ import { getUserJournals, getJournalEntries, deleteJournalEntry, getUserGoals } 
 import { Journal, JournalEntry, Goal } from "@/lib/firebase/types"
 import { useAuth } from "@/lib/firebase/auth"
 import { createJournal } from "@/lib/firebase/db"
+import DailyAffirmation from "@/components/DailyAffirmation"
+import { Navigation } from "@/components/Navigation"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function DashboardPage() {
   console.log('JournalPage render start');
@@ -69,6 +73,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [lastFetch, setLastFetch] = useState<number>(0);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [showActivityOverview, setShowActivityOverview] = useState(false);
   const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes in milliseconds
   const [stats, setStats] = useState({
     currentStreak: 0,
@@ -154,23 +159,32 @@ export default function DashboardPage() {
       console.log('Goals loaded:', userGoals);
       setGoals(userGoals);
 
-      // Only try to load entries if we have journals
-      if (userJournals.length > 0) {
+      // Load entries for all journals
+      const allEntries: JournalEntry[] = [];
+      for (const journal of userJournals) {
         try {
-          // Store the current journal ID
-          localStorage.setItem('currentJournalId', userJournals[0].id!);
-          const journalEntries = await getJournalEntries(user.uid, userJournals[0].id!);
-          setEntries(journalEntries);
+          const journalEntries = await getJournalEntries(user.uid, journal.id!);
+          allEntries.push(...journalEntries);
         } catch (entriesError) {
-          console.warn('Could not load entries:', entriesError);
-          setEntries([]);
+          console.warn(`Could not load entries for journal ${journal.id}:`, entriesError);
         }
       }
+      
+      // Sort entries by date (newest first)
+      allEntries.sort((a, b) => {
+        const dateA = (a.createdAt as unknown as Timestamp)?.toDate?.() || new Date(a.createdAt) || new Date(0);
+        const dateB = (b.createdAt as unknown as Timestamp)?.toDate?.() || new Date(b.createdAt) || new Date(0);
+        return dateB.getTime() - dateA.getTime();
+      });
+      
+      setEntries(allEntries)
+      console.log('Entries loaded:', allEntries.length);
 
       setLastFetch(Date.now());
     } catch (err) {
       console.error('Error loading data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load journal data');
+      setEntries([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
@@ -195,7 +209,6 @@ export default function DashboardPage() {
     
     try {
       setLoading(true)
-      const journalId = localStorage.getItem('currentJournalId') || 'default'
       
       // Load journals
       const userJournals = await getUserJournals(user.uid)
@@ -207,36 +220,52 @@ export default function DashboardPage() {
       console.log('Goals loaded in loadDashboardData:', userGoals);
       setGoals(userGoals);
       
-      // Load entries
-      const journalEntries = await getJournalEntries(user.uid, journalId)
-      setEntries(journalEntries)
+      // Load entries from all journals
+      const allEntries: JournalEntry[] = [];
+      for (const journal of userJournals) {
+        try {
+          const journalEntries = await getJournalEntries(user.uid, journal.id!);
+          allEntries.push(...journalEntries);
+        } catch (entriesError) {
+          console.warn(`Could not load entries for journal ${journal.id}:`, entriesError);
+        }
+      }
+      
+      // Sort entries by date (newest first)
+      allEntries.sort((a, b) => {
+        const dateA = (a.createdAt as unknown as Timestamp)?.toDate?.() || new Date(a.createdAt) || new Date(0);
+        const dateB = (b.createdAt as unknown as Timestamp)?.toDate?.() || new Date(b.createdAt) || new Date(0);
+        return dateB.getTime() - dateA.getTime();
+      });
+      
+      setEntries(allEntries);
       
       // Calculate stats
       const now = new Date()
       const weekStart = startOfWeek(now)
       const monthStart = startOfMonth(now)
       
-      const entriesThisWeek = journalEntries.filter(entry => 
+      const entriesThisWeek = allEntries.filter(entry => 
         isAfter(new Date(entry.createdAt), weekStart)
       ).length
       
-      const entriesThisMonth = journalEntries.filter(entry => 
+      const entriesThisMonth = allEntries.filter(entry => 
         isAfter(new Date(entry.createdAt), monthStart)
       ).length
 
       // Calculate morning entries percentage
-      const morningEntries = journalEntries.filter(entry => {
+      const morningEntries = allEntries.filter(entry => {
         const entryHour = new Date(entry.createdAt).getHours()
         return entryHour >= 5 && entryHour < 12 // Between 5 AM and noon
       }).length
-      const morningPercentage = journalEntries.length > 0 
-        ? Math.round((morningEntries / journalEntries.length) * 100)
+      const morningPercentage = allEntries.length > 0 
+        ? Math.round((morningEntries / allEntries.length) * 100)
         : 0
 
       // Calculate consistency
       const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
       const daysWithEntries = new Set(
-        journalEntries
+        allEntries
           .filter(entry => isAfter(new Date(entry.createdAt), monthStart))
           .map(entry => format(new Date(entry.createdAt), 'yyyy-MM-dd'))
       ).size
@@ -248,7 +277,7 @@ export default function DashboardPage() {
       let currentCount = 0
       
       // Group entries by date
-      const entriesByDate = journalEntries.reduce((acc, entry) => {
+      const entriesByDate = allEntries.reduce((acc, entry) => {
         const date = format(new Date(entry.createdAt), 'yyyy-MM-dd')
         acc[date] = (acc[date] || 0) + 1
         return acc
@@ -271,14 +300,21 @@ export default function DashboardPage() {
         }
       })
       
+      // Calculate average time
+      const totalTime = allEntries.reduce((sum, entry) => {
+        const timeSpent = entry.metadata?.timeSpent || 0; // Time in minutes
+        return sum + timeSpent;
+      }, 0);
+      const avgTime = allEntries.length > 0 ? Math.round(totalTime / allEntries.length) : 0;
+      
       setStats({
         currentStreak,
         longestStreak,
         thisWeek: entriesThisWeek,
         thisMonth: entriesThisMonth,
-        totalEntries: journalEntries.length,
+        totalEntries: allEntries.length,
         morningPercentage,
-        avgTime: 12, // Placeholder value
+        avgTime,
         consistency
       })
       
@@ -394,35 +430,7 @@ export default function DashboardPage() {
           <Edit3 className="h-5 w-5" />
           <span>JournalMind</span>
         </Link>
-        <nav className="ml-auto flex gap-2">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal">Dashboard</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal/browse">Journal</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/goals">Goals</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/affirmations">Affirmations</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/marketplace">Marketplace</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin/templates">Admin</Link>
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={handleLogout}
-            className="text-red-500 hover:text-red-600 hover:bg-red-50"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
-        </nav>
+        <Navigation onLogout={handleLogout} />
       </header>
       <main className="flex-1">
         <div className="mx-auto max-w-6xl p-6 md:p-8 lg:p-10 space-y-8">
@@ -446,85 +454,163 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Stats Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="bg-yellow-50">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2">
-                  <Flame className="h-5 w-5 text-yellow-500" />
-                  <h3 className="font-medium">Current Streak</h3>
-                  </div>
-                <div className="mt-2">
-                  <div className="text-2xl font-bold">{stats.currentStreak} days</div>
-                  <div className="text-sm text-muted-foreground">Longest: {stats.longestStreak} days</div>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Metrics Grid */}
+          <div className="space-y-4">
+            <Tabs defaultValue="journal" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="journal" className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4" />
+                  Journal Overview
+                </TabsTrigger>
+                <TabsTrigger value="activity" className="flex items-center gap-2">
+                  <Activity className="h-4 w-4" />
+                  Activity Overview
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="journal">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Card className="bg-yellow-50">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-2">
+                        <Flame className="h-5 w-5 text-yellow-500" />
+                        <h3 className="font-medium">Current Streak</h3>
+                      </div>
+                      <div className="mt-2">
+                        <div className="text-2xl font-bold">{stats.currentStreak} days</div>
+                        <div className="text-sm text-muted-foreground">Longest: {stats.longestStreak} days</div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-blue-500" />
-                  <h3 className="font-medium">This Week</h3>
-                </div>
-                <div className="mt-2">
-                  <div className="text-2xl font-bold">{stats.thisWeek} entries</div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <div className="flex-1 bg-gray-200 rounded-full h-2.5">
-                      <div 
-                        className="bg-blue-500 h-2.5 rounded-full transition-all duration-300" 
-                        style={{ width: `${Math.min((stats.thisWeek / 7) * 100, 100)}%` }} 
-                      />
-                    </div>
-                    <div className="min-w-[3rem] text-right">
-                      <span className="text-sm text-muted-foreground">
-                        {Math.round((stats.thisWeek / 7) * 100)}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-5 w-5 text-blue-500" />
+                        <h3 className="font-medium">This Week</h3>
+                      </div>
+                      <div className="mt-2">
+                        <div className="text-2xl font-bold">{stats.thisWeek} entries</div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <div className="flex-1 bg-gray-200 rounded-full h-2.5">
+                            <div 
+                              className="bg-blue-500 h-2.5 rounded-full transition-all duration-300" 
+                              style={{ width: `${Math.min((stats.thisWeek / 7) * 100, 100)}%` }} 
+                            />
+                          </div>
+                          <div className="min-w-[3rem] text-right">
+                            <span className="text-sm text-muted-foreground">
+                              {Math.round((stats.thisWeek / 7) * 100)}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2">
-                  <CalendarDays className="h-5 w-5 text-purple-500" />
-                  <h3 className="font-medium">This Month</h3>
-                </div>
-                <div className="mt-2">
-                  <div className="text-2xl font-bold">{stats.thisMonth} entries</div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-purple-500 h-2 rounded-full" 
-                        style={{ width: `${(stats.thisMonth / 30) * 100}%` }} 
-                      />
-                    </div>
-                    <span className="text-sm text-muted-foreground">
-                      {Math.round((stats.thisMonth / 30) * 100)}%
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-2">
+                        <CalendarDays className="h-5 w-5 text-purple-500" />
+                        <h3 className="font-medium">This Month</h3>
+                      </div>
+                      <div className="mt-2">
+                        <div className="text-2xl font-bold">{stats.thisMonth} entries</div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-purple-500 h-2 rounded-full" 
+                              style={{ width: `${(stats.thisMonth / 30) * 100}%` }} 
+                            />
+                          </div>
+                          <span className="text-sm text-muted-foreground">
+                            {Math.round((stats.thisMonth / 30) * 100)}%
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-green-500" />
-                  <h3 className="font-medium">Total Entries</h3>
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="h-5 w-5 text-green-500" />
+                        <h3 className="font-medium">Total Entries</h3>
+                      </div>
+                      <div className="mt-2">
+                        <div className="text-2xl font-bold">{stats.totalEntries}</div>
+                        <div className="text-sm text-muted-foreground">Across {categoryDistribution.length} categories</div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
-                <div className="mt-2">
-                  <div className="text-2xl font-bold">{stats.totalEntries}</div>
-                  <div className="text-sm text-muted-foreground">Across {categoryDistribution.length} categories</div>
+              </TabsContent>
+
+              <TabsContent value="activity">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-medium">Consistency</h3>
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      </div>
+                      <div className="text-2xl font-bold">{stats.consistency}%</div>
+                      <p className="text-sm text-muted-foreground">of days this month</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-medium">Average Time</h3>
+                        <Clock className="h-5 w-5 text-blue-500" />
+                      </div>
+                      <div className="text-2xl font-bold">{stats.avgTime} min</div>
+                      <p className="text-sm text-muted-foreground">per journal entry</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-medium">Morning Entries</h3>
+                        <Sun className="h-5 w-5 text-yellow-500" />
+                      </div>
+                      <div className="text-2xl font-bold">{stats.morningPercentage}%</div>
+                      <p className="text-sm text-muted-foreground">of all entries</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-medium">Goal Progress</h3>
+                        <Target className="h-5 w-5 text-purple-500" />
+                      </div>
+                      <div className="text-2xl font-bold">
+                        {goals.length > 0 
+                          ? `${goals.filter(g => {
+                              const progress = Number(g.progress || 0);
+                              const target = Number(g.targets[0]?.value || 0);
+                              return progress >= target && target > 0;
+                            }).length}/${goals.length}`
+                          : "0/0"}
+                      </div>
+                      <p className="text-sm text-muted-foreground">goals completed</p>
+                    </CardContent>
+                  </Card>
                 </div>
-              </CardContent>
-            </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Daily Affirmation */}
+          <div className="mt-6">
+            <DailyAffirmation journalTypeId="reflection" />
           </div>
 
           {/* Goal Progress Section */}
-          <div className="space-y-4">
+          <div className="space-y-4 mt-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold flex items-center gap-2">
                 <Target className="h-5 w-5" />
@@ -535,30 +621,47 @@ export default function DashboardPage() {
               </Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {goals.map((goal) => (
-                <Card key={goal.id}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-medium">{goal.title}</h3>
-                      <div className="text-sm text-muted-foreground">{goal.category}</div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Progress: {goal.progress} / {goal.targets[0].value} {goal.targets[0].unit}</span>
-                        <span>{Math.round((Number(goal.progress) / Number(goal.targets[0].value)) * 100)}%</span>
+              {goals.map((goal) => {
+                const progress = Number(goal.progress || 0);
+                const target = Number(goal.targets[0]?.value || 0);
+                const percentage = target > 0 ? Math.min((progress / target) * 100, 100) : 0;
+                const isCompleted = progress >= target && target > 0;
+                
+                return (
+                  <Card key={goal.id} className={isCompleted ? "bg-green-50" : ""}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-medium">{goal.title}</h3>
+                        <div className="flex items-center gap-2">
+                          <div className="text-sm text-muted-foreground">{goal.category}</div>
+                          {isCompleted && (
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                          )}
+                        </div>
                       </div>
-                      <Progress value={(Number(goal.progress) / Number(goal.targets[0].value)) * 100} />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Progress: {progress} / {target} {goal.targets[0]?.unit || ''}</span>
+                          <span className={isCompleted ? "text-green-500 font-medium" : ""}>
+                            {Math.round(percentage)}%
+                          </span>
+                        </div>
+                        <Progress 
+                          value={percentage} 
+                          className={isCompleted ? "bg-green-100" : ""}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
 
           {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Recent Entries */}
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-8">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">Recent Entries</h2>
                 <Button variant="ghost" size="sm" className="text-blue-500" asChild>
@@ -566,35 +669,27 @@ export default function DashboardPage() {
                 </Button>
               </div>
 
-                <div className="space-y-4">
+              <div className="space-y-4">
                 {entries.slice(0, 3).map((entry) => {
                   const categoryStyles = getCategoryStyles(entry.metadata?.type || 'mood-feelings')
                   return (
-                    <div key={entry.id} className="flex flex-col space-y-2 rounded-lg border p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h3 className="font-medium mb-1">{entry.metadata?.title || "Journal Entry"}</h3>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Clock className="h-3.5 w-3.5" />
-                            <span>
-                              {new Date(entry.createdAt).toLocaleString('en-US', {
-                                month: 'long',
-                                day: 'numeric',
-                                hour: 'numeric',
-                                minute: '2-digit',
-                                hour12: true
-                              })}
+                    <Card key={entry.id} className="overflow-hidden">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className={cn(
+                              "inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium",
+                              categoryStyles.bgColorLight,
+                              categoryStyles.color
+                            )}>
+                              {React.createElement(categoryStyles.icon, { className: "h-3.5 w-3.5" })}
+                              {formatCategoryName(entry.metadata?.type || 'mood-feelings')}
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              {entry.createdAt instanceof Date 
+                                ? format(entry.createdAt, 'MMM d, yyyy')
+                                : format(new Date(entry.createdAt), 'MMM d, yyyy')}
                             </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className={cn(
-                            "inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium",
-                            categoryStyles.bgColorLight,
-                            categoryStyles.color
-                          )}>
-                            {React.createElement(categoryStyles.icon, { className: "h-3.5 w-3.5" })}
-                            {formatCategoryName(entry.metadata?.type || 'mood-feelings')}
                           </div>
                           <Button
                             variant="ghost"
@@ -626,38 +721,46 @@ export default function DashboardPage() {
                             <span className="sr-only">Delete entry</span>
                           </Button>
                         </div>
-                      </div>
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {entry.metadata?.firstTextBox || entry.content}
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {entry.tags?.map((tag) => (
-                          <span
-                            key={tag} 
-                            className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:bg-secondary"
+                        <div className="mt-2">
+                          <h3 className="font-medium">
+                            {entry.metadata?.title || formatCategoryName(entry.metadata?.type || 'mood-feelings')}
+                          </h3>
+                          <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                            {entry.metadata?.firstTextBox || entry.content}
+                          </p>
+                        </div>
+                        {entry.tags && entry.tags.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-1">
+                            {entry.tags.map((tag) => (
+                              <span
+                                key={tag} 
+                                className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:bg-secondary"
+                              >
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="mt-3">
+                          <Link
+                            href={`/journal/${entry.id}`}
+                            className="inline-flex items-center justify-center gap-2 text-sm font-medium text-primary hover:text-primary/80"
                           >
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="pt-2">
-                        <Link
-                          href={`/journal/${entry.id}`}
-                          className="inline-flex items-center justify-center gap-2 text-sm font-medium hover:text-primary"
-                        >
-                          Read More
-                        </Link>
-                      </div>
-                    </div>
+                            Read More
+                            <ChevronRight className="h-4 w-4" />
+                          </Link>
+                        </div>
+                      </CardContent>
+                    </Card>
                   )
                 })}
               </div>
-                </div>
+            </div>
 
             {/* Category Distribution */}
-            <div>
-            <Card>
-              <CardHeader>
+            <div className="lg:col-span-4">
+              <Card>
+                <CardHeader>
                   <div className="flex items-center gap-2">
                     <PieChart className="h-5 w-5 text-blue-500" />
                     <CardTitle>Category Distribution</CardTitle>
@@ -665,26 +768,26 @@ export default function DashboardPage() {
                   <CardDescription>
                     Breakdown of your journal entries by category
                   </CardDescription>
-              </CardHeader>
+                </CardHeader>
                 <div className="p-6 pt-0">
-                <div className="space-y-4">
+                  <div className="space-y-4">
                     {categoryDistribution.map((category) => {
                       const percentage = totalEntries > 0 ? (category.count / totalEntries) * 100 : 0
                       return (
-                    <div key={category.name} className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+                        <div key={category.name} className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
                               <div className={`rounded-full p-1 bg-opacity-20 ${category.color.replace('bg-', 'text-')}`}>
-                            {category.icon}
+                                {category.icon}
+                              </div>
+                              <span className="text-sm font-medium">{category.name}</span>
+                            </div>
+                            <span className="text-sm text-muted-foreground">{category.count}</span>
                           </div>
-                          <span className="text-sm font-medium">{category.name}</span>
-                        </div>
-                        <span className="text-sm text-muted-foreground">{category.count}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <div
-                            className={`h-2 rounded-full ${category.color}`}
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                              <div
+                                className={`h-2 rounded-full ${category.color}`}
                                 style={{ width: `${percentage.toFixed(4)}%` }} 
                               />
                             </div>
@@ -693,104 +796,11 @@ export default function DashboardPage() {
                         </div>
                       )
                     })}
-                    </div>
+                  </div>
                 </div>
-            </Card>
+              </Card>
             </div>
           </div>
-
-          {/* Marketplace Journals */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <ShoppingBag className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">Your Marketplace Journals</h2>
-                      </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {journals.map((journal) => (
-                <Card key={journal.id}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className={`${journal.color} p-2 rounded-full text-white`}>
-                        {getIconForCategory(journal.metadata?.type)}
-                      </div>
-                      <div>
-                        <h3 className="font-medium">{journal.metadata?.title || "Journal"}</h3>
-                        <p className="text-sm text-muted-foreground">{journal.entries?.length || 0} entries</p>
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Last entry: {journal.entries && journal.entries.length > 0 
-                        ? new Date(journal.entries[journal.entries.length - 1].createdAt).toLocaleDateString() 
-                        : "No entries yet"}
-                    </p>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" className="flex-1" asChild>
-                        <Link href={`/journal/${journal.id}`}>Open Journal</Link>
-                      </Button>
-                      <Button size="sm" className="flex-1" asChild>
-                        <Link href={`/journal/create-entry?template=${journal.id}`}>
-                          Create Entry
-                        </Link>
-                      </Button>
-                  </div>
-                  </CardContent>
-                </Card>
-                ))}
-              </div>
-          </div>
-
-          {/* Activity Overview */}
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Activity Overview
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium">Consistency</h3>
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                  </div>
-                  <div className="text-2xl font-bold">{stats.consistency}%</div>
-                  <p className="text-sm text-muted-foreground">of days this month</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium">Average Time</h3>
-                    <Clock className="h-5 w-5 text-blue-500" />
-                  </div>
-                  <div className="text-2xl font-bold">{stats.avgTime} min</div>
-                  <p className="text-sm text-muted-foreground">per journal entry</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium">Morning Entries</h3>
-                    <Sun className="h-5 w-5 text-yellow-500" />
-                  </div>
-                  <div className="text-2xl font-bold">{stats.morningPercentage}%</div>
-                  <p className="text-sm text-muted-foreground">of all entries</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium">Goal Progress</h3>
-                    <Target className="h-5 w-5 text-purple-500" />
-                  </div>
-                  <div className="text-2xl font-bold">3/5</div>
-                  <p className="text-sm text-muted-foreground">active goals</p>
-                </CardContent>
-              </Card>
-                </div>
-              </div>
         </div>
       </main>
     </div>

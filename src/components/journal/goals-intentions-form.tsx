@@ -226,15 +226,6 @@ export default function GoalsIntentionsForm({ onSubmit }: GoalsIntentionsFormPro
       return [{ value: "custom", label: "Custom", system: "metric" }]
     }
 
-    // Special handling for swimming to show laps as primary unit
-    if (goalType === "Swimming") {
-      return [
-        { value: "laps", label: "Laps", system: "metric" },
-        { value: "meters", label: "Meters", system: "metric" },
-        { value: "yards", label: "Yards", system: "imperial" }
-      ]
-    }
-
     return [
       { value: typeUnits.metric, label: typeUnits.metric, system: "metric" },
       { value: typeUnits.imperial, label: typeUnits.imperial, system: "imperial" }

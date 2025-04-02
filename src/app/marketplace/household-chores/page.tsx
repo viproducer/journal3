@@ -22,9 +22,6 @@ export default function HouseholdChoresJournalPage() {
             <Link href="/journal">Journal</Link>
           </Button>
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/affirmations">Affirmations</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
             <Link href="/marketplace">Marketplace</Link>
           </Button>
           <Button variant="ghost" size="sm" asChild>

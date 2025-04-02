@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 import {
   Edit3,
@@ -21,8 +23,23 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Navigation } from "@/components/Navigation"
+import { useAuth } from "@/lib/firebase/auth"
+import { useRouter } from "next/navigation"
 
 export default function MarketplacePage() {
+  const router = useRouter();
+  const { logout } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.replace('/auth/signin');
+    } catch (err) {
+      console.error('Failed to log out:', err);
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background px-6">
@@ -30,26 +47,7 @@ export default function MarketplacePage() {
           <Edit3 className="h-5 w-5" />
           <span>JournalMind</span>
         </Link>
-        <nav className="ml-auto flex gap-2">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal">Dashboard</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal">Journal</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/goals">Goals</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/affirmations">Affirmations</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/marketplace">Marketplace</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin/templates">Admin</Link>
-          </Button>
-        </nav>
+        <Navigation onLogout={handleLogout} />
       </header>
       <main className="flex-1 p-6 md:p-8 lg:p-10">
         <div className="mx-auto max-w-6xl space-y-8">

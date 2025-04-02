@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/firebase/auth"
 import type { MarketplaceTemplate } from "@/lib/firebase/types"
 import { getTemplates, deleteTemplate } from "@/lib/firebase/templates"
 import Link from "next/link"
+import { AdminNav } from "@/components/admin/admin-nav"
 import {
   Card,
   CardContent,
@@ -102,6 +103,7 @@ export default function AdminTemplatesPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <AdminNav />
       <header className="container mx-auto py-8">
         <div className="flex justify-between items-center">
           <div>
@@ -129,8 +131,6 @@ export default function AdminTemplatesPage() {
                     <TableHead>Name</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Users</TableHead>
-                    <TableHead>Rating</TableHead>
                     <TableHead>Updated</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -149,12 +149,16 @@ export default function AdminTemplatesPage() {
                           {template.isActive ? "Active" : "Inactive"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">{template.users?.toLocaleString() ?? 0}</TableCell>
                       <TableCell className="text-right">
-                        {(template.rating || 0) > 0 ? (template.rating || 0).toFixed(1) : "-"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {template.updatedAt ? format(template.updatedAt, 'MMM d, yyyy') : '-'}
+                        {template.updatedAt ? (
+                          (() => {
+                            try {
+                              return format(new Date(template.updatedAt), 'MMM d, yyyy')
+                            } catch (error) {
+                              return '-'
+                            }
+                          })()
+                        ) : '-'}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>

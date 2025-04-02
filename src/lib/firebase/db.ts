@@ -785,14 +785,12 @@ export async function getProgressHistory(goalId: string, userId: string): Promis
   try {
     console.log('Getting progress history for goal:', goalId);
     
-    // Use collection group query to get all progress history entries
-    const progressHistoryRef = collectionGroup(db, 'progress_history');
+    // Get the nested progress history collection reference
+    const progressHistoryRef = collection(db, 'users', userId, 'goals', goalId, 'progress_history');
     
-    // Query for progress history entries for this goal and user
+    // Query for progress history entries
     const q = query(
       progressHistoryRef,
-      where('goalId', '==', goalId),
-      where('userId', '==', userId),
       orderBy('timestamp', 'desc')
     );
 
