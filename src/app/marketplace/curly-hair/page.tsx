@@ -13,8 +13,12 @@ import {
   Wind,
   Sun,
   Thermometer,
+  Calendar,
+  Beaker,
+  TrendingUp,
 } from "lucide-react"
-
+import { useAuth } from "@/lib/firebase/auth"
+import { Navigation } from "@/components/Navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -22,6 +26,16 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 
 export default function CurlyHairJournalPage() {
+  const { logout } = useAuth()
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background px-6">
@@ -29,23 +43,7 @@ export default function CurlyHairJournalPage() {
           <Edit3 className="h-5 w-5" />
           <span>JournalMind</span>
         </Link>
-        <nav className="ml-auto flex gap-2">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal">Dashboard</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal">Journal</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal">Affirmations</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/marketplace">Marketplace</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin/templates">Admin</Link>
-          </Button>
-        </nav>
+        <Navigation onLogout={handleLogout} />
       </header>
       <main className="flex-1 p-6 md:p-8 lg:p-10">
         <div className="mx-auto max-w-4xl space-y-8">
@@ -57,323 +55,277 @@ export default function CurlyHairJournalPage() {
           </Button>
 
           <div className="rounded-xl bg-gradient-to-r from-purple-400 to-purple-600 p-8 text-white">
-            <Badge className="mb-4 bg-white/20 text-white hover:bg-white/30">Beauty & Self-Care</Badge>
-            <h1 className="text-3xl font-bold">Wavy & Curly Hair Journal</h1>
+            <Badge className="mb-4 bg-white/20 text-white hover:bg-white/30">Beauty & Wellness</Badge>
+            <h1 className="text-3xl font-bold">Curly Hair Care Journal</h1>
             <p className="mt-2 max-w-2xl text-white/90">
-              Track your hair care journey, manage products and ingredients, and see what works best for your unique
-              hair type.
+              Track your curly hair care routine, products, and results to achieve your best curls.
             </p>
-            <div className="mt-6 flex items-center gap-4">
-              <div className="flex items-center gap-1">
-                <Star className="h-5 w-5 text-yellow-300" />
-                <Star className="h-5 w-5 text-yellow-300" />
-                <Star className="h-5 w-5 text-yellow-300" />
-                <Star className="h-5 w-5 text-yellow-300" />
-                <Star className="h-5 w-5 text-yellow-300" />
-                <span className="ml-2 font-medium">4.9</span>
-                <span className="text-white/70">(215 ratings)</span>
+            <div className="mt-6 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1">
+                  <Star className="h-5 w-5 text-yellow-300" />
+                  <Star className="h-5 w-5 text-yellow-300" />
+                  <Star className="h-5 w-5 text-yellow-300" />
+                  <Star className="h-5 w-5 text-yellow-300" />
+                  <Star className="h-5 w-5 text-yellow-300" />
+                  <span className="ml-2 font-medium">4.8</span>
+                  <span className="text-white/70">(156 ratings)</span>
+                </div>
+                <span className="text-white/70">•</span>
+                <span className="text-white/90">2,450 active users</span>
               </div>
-              <span className="text-white/70">•</span>
-              <span className="text-white/90">3,120 active users</span>
+              <Button className="bg-white text-purple-600 hover:bg-white/90" asChild>
+                <Link href="/journal/templates/curly-hair">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add to My Journals
+                </Link>
+              </Button>
             </div>
           </div>
 
-          <div className="grid gap-8 md:grid-cols-3">
-            <div className="md:col-span-2 space-y-8">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Journal Features</CardTitle>
-                  <CardDescription>Everything you need to track your hair care journey</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="flex items-start gap-2">
-                      <div className="rounded-full bg-purple-100 p-1.5 text-purple-600 dark:bg-purple-900 dark:text-purple-300">
-                        <Scissors className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h3 className="font-medium">Product Library</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Create a personal library of all your hair products with details on ingredients and usage.
-                        </p>
-                      </div>
+          <div className="space-y-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Journal Features</CardTitle>
+                <CardDescription>Everything you need to track your curly hair journey</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="flex items-start gap-2">
+                    <div className="rounded-full bg-purple-100 p-1.5 text-purple-600 dark:bg-purple-900 dark:text-purple-300">
+                      <Calendar className="h-5 w-5" />
                     </div>
-                    <div className="flex items-start gap-2">
-                      <div className="rounded-full bg-pink-100 p-1.5 text-pink-600 dark:bg-pink-900 dark:text-pink-300">
-                        <Tag className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h3 className="font-medium">Ingredient Tracking</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Track which ingredients work for your hair and which ones to avoid.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <div className="rounded-full bg-indigo-100 p-1.5 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-300">
-                        <Camera className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h3 className="font-medium">Photo Progress</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Document your hair journey with before and after photos for each routine.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <div className="rounded-full bg-blue-100 p-1.5 text-blue-600 dark:bg-blue-900 dark:text-blue-300">
-                        <Sparkles className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h3 className="font-medium">Routine Builder</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Create and save custom routines with product combinations and application methods.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  <div>
-                    <h3 className="mb-4 font-medium">Track Environmental Factors</h3>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="flex items-center gap-2">
-                        <Droplet className="h-4 w-4 text-blue-500" />
-                        <span className="text-sm">Humidity levels</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Wind className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm">Weather conditions</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Sun className="h-4 w-4 text-yellow-500" />
-                        <span className="text-sm">Sun exposure</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Thermometer className="h-4 w-4 text-red-500" />
-                        <span className="text-sm">Heat styling usage</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-4 pt-4 border-t">
-                    <Button variant="outline" className="w-full" asChild>
-                      <Link href="/journal/create-entry?template=curly-hair">
-                        <Edit3 className="mr-2 h-4 w-4" />
-                        Create Journal Entry
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>How It Works</CardTitle>
-                  <CardDescription>Get started with your hair care journal in minutes</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Tabs defaultValue="products">
-                    <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="products">Products</TabsTrigger>
-                      <TabsTrigger value="routines">Routines</TabsTrigger>
-                      <TabsTrigger value="tracking">Tracking</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="products" className="mt-4 space-y-4">
-                      <div className="rounded-lg border p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                            1
-                          </div>
-                          <div>
-                            <h3 className="font-medium">Create Your Product Library</h3>
-                            <p className="text-sm text-muted-foreground">
-                              Add all your hair products to your personal library with details on brand, product type,
-                              and key ingredients.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="rounded-lg border p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                            2
-                          </div>
-                          <div>
-                            <h3 className="font-medium">Tag Key Ingredients</h3>
-                            <p className="text-sm text-muted-foreground">
-                              Mark important ingredients in each product to track what works for your hair over time.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="rounded-lg border p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                            3
-                          </div>
-                          <div>
-                            <h3 className="font-medium">Rate Product Performance</h3>
-                            <p className="text-sm text-muted-foreground">
-                              After using products, rate how well they worked for your hair to build your personalized
-                              recommendations.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </TabsContent>
-                    <TabsContent value="routines" className="mt-4 space-y-4">
-                      <div className="rounded-lg border p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                            1
-                          </div>
-                          <div>
-                            <h3 className="font-medium">Create Wash Day Routines</h3>
-                            <p className="text-sm text-muted-foreground">
-                              Build step-by-step routines selecting products from your library and specifying amounts
-                              and application methods.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="rounded-lg border p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                            2
-                          </div>
-                          <div>
-                            <h3 className="font-medium">Save Multiple Routines</h3>
-                            <p className="text-sm text-muted-foreground">
-                              Create different routines for different needs: clarifying wash, protein treatment, deep
-                              conditioning, etc.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="rounded-lg border p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                            3
-                          </div>
-                          <div>
-                            <h3 className="font-medium">Adjust Product Ratios</h3>
-                            <p className="text-sm text-muted-foreground">
-                              Experiment with different product combinations and ratios to find your perfect formula.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </TabsContent>
-                    <TabsContent value="tracking" className="mt-4 space-y-4">
-                      <div className="rounded-lg border p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                            1
-                          </div>
-                          <div>
-                            <h3 className="font-medium">Document With Photos</h3>
-                            <p className="text-sm text-muted-foreground">
-                              Take before and after photos of each wash day to visually track your progress and results.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="rounded-lg border p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                            2
-                          </div>
-                          <div>
-                            <h3 className="font-medium">Rate Results</h3>
-                            <p className="text-sm text-muted-foreground">
-                              Rate each wash day on factors like definition, volume, frizz control, and moisture
-                              balance.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="rounded-lg border p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                            3
-                          </div>
-                          <div>
-                            <h3 className="font-medium">Analyze Patterns</h3>
-                            <p className="text-sm text-muted-foreground">
-                              Review your journal entries to identify patterns and discover what works best for your
-                              hair.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </TabsContent>
-                  </Tabs>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="space-y-6">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle>Add to My Journals</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Check className="h-5 w-5 text-green-500" />
-                      <span className="text-sm">Unlimited product entries</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Check className="h-5 w-5 text-green-500" />
-                      <span className="text-sm">Photo progress tracking</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Check className="h-5 w-5 text-green-500" />
-                      <span className="text-sm">Environmental factor tracking</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Check className="h-5 w-5 text-green-500" />
-                      <span className="text-sm">Routine builder & saver</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Check className="h-5 w-5 text-green-500" />
-                      <span className="text-sm">Ingredient analysis</span>
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter className="border-t bg-muted/20 px-6 py-4">
-                  <Button className="w-full" asChild>
-                    <Link href="/journal/templates/curly-hair">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add to My Journals
-                    </Link>
-                  </Button>
-                </CardFooter>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Related Journals</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="h-12 w-12 rounded-md bg-gradient-to-r from-pink-400 to-pink-600"></div>
                     <div>
-                      <h3 className="font-medium">Skincare Tracker</h3>
-                      <p className="text-sm text-muted-foreground">Track your skincare routine and product results</p>
+                      <h3 className="font-medium">Routine Tracking</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Log your wash days, treatments, and styling routines.
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="h-12 w-12 rounded-md bg-gradient-to-r from-blue-400 to-blue-600"></div>
+                  <div className="flex items-start gap-2">
+                    <div className="rounded-full bg-blue-100 p-1.5 text-blue-600 dark:bg-blue-900 dark:text-blue-300">
+                      <Beaker className="h-5 w-5" />
+                    </div>
                     <div>
-                      <h3 className="font-medium">Makeup Collection</h3>
-                      <p className="text-sm text-muted-foreground">Organize and track your makeup products</p>
+                      <h3 className="font-medium">Product Reviews</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Track which products work best for your hair type and needs.
+                      </p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                  <div className="flex items-start gap-2">
+                    <div className="rounded-full bg-green-100 p-1.5 text-green-600 dark:bg-green-900 dark:text-green-300">
+                      <TrendingUp className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">Progress Tracking</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Monitor your hair health and growth over time.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <div className="rounded-full bg-amber-100 p-1.5 text-amber-600 dark:bg-amber-900 dark:text-amber-300">
+                      <Camera className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">Photo Journal</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Document your hair journey with before and after photos.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>How It Works</CardTitle>
+                <CardDescription>Get started with your curly hair care journal in minutes</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="setup">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="setup">Setup</TabsTrigger>
+                    <TabsTrigger value="tracking">Tracking</TabsTrigger>
+                    <TabsTrigger value="progress">Progress</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="setup" className="mt-4 space-y-4">
+                    <div className="rounded-lg border p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          1
+                        </div>
+                        <div>
+                          <h3 className="font-medium">Document Your Hair Type</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Record your curl pattern, porosity, and other key characteristics.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          2
+                        </div>
+                        <div>
+                          <h3 className="font-medium">Set Your Goals</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Define what you want to achieve with your hair care journey.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          3
+                        </div>
+                        <div>
+                          <h3 className="font-medium">Create Your Routine</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Set up your regular wash days and treatment schedule.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="tracking" className="mt-4 space-y-4">
+                    <div className="rounded-lg border p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          1
+                        </div>
+                        <div>
+                          <h3 className="font-medium">Log Wash Days</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Record your cleansing and conditioning routines.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          2
+                        </div>
+                        <div>
+                          <h3 className="font-medium">Track Products</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Document which products you use and their effects.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          3
+                        </div>
+                        <div>
+                          <h3 className="font-medium">Note Observations</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Record how your hair responds to different products and techniques.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="progress" className="mt-4 space-y-4">
+                    <div className="rounded-lg border p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          1
+                        </div>
+                        <div>
+                          <h3 className="font-medium">Track Growth</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Monitor your hair length and health over time.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          2
+                        </div>
+                        <div>
+                          <h3 className="font-medium">Photo Progress</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Compare before and after photos to see your progress.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          3
+                        </div>
+                        <div>
+                          <h3 className="font-medium">Adjust Your Routine</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Use insights to refine your hair care approach.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Related Journals</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Card className="overflow-hidden">
+                    <div className="h-32 bg-gradient-to-r from-pink-400 to-pink-600 p-4">
+                      <div className="flex h-full flex-col justify-between text-white">
+                        <Badge className="w-fit bg-white/20 text-white hover:bg-white/30">Beauty</Badge>
+                        <div>
+                          <h3 className="text-xl font-bold">Skincare Journal</h3>
+                          <p className="text-sm opacity-90">Track your skincare routine and results</p>
+                        </div>
+                      </div>
+                    </div>
+                    <CardContent className="p-4">
+                      <Button variant="outline" className="w-full" asChild>
+                        <Link href="/marketplace/skincare">
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add to My Journals
+                        </Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="overflow-hidden">
+                    <div className="h-32 bg-gradient-to-r from-rose-400 to-rose-600 p-4">
+                      <div className="flex h-full flex-col justify-between text-white">
+                        <Badge className="w-fit bg-white/20 text-white hover:bg-white/30">Beauty</Badge>
+                        <div>
+                          <h3 className="text-xl font-bold">Makeup Collection</h3>
+                          <p className="text-sm opacity-90">Organize and track your makeup inventory</p>
+                        </div>
+                      </div>
+                    </div>
+                    <CardContent className="p-4">
+                      <Button variant="outline" className="w-full" asChild>
+                        <Link href="/marketplace/makeup-collection">
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add to My Journals
+                        </Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </main>

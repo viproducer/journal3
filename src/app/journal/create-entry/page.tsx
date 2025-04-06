@@ -21,7 +21,8 @@ import {
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/firebase/auth"
 import { createEntry, getUserJournals, createJournal } from "@/lib/firebase/db"
-import { JournalEntry, Journal } from "@/lib/firebase/types"
+import { getPublicTemplates } from "@/lib/firebase/templates"
+import { JournalEntry, Journal, MarketplaceTemplate } from "@/lib/firebase/types"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -34,13 +35,15 @@ import FutureVisioningForm from "@/components/journal/future-visioning-form"
 import JournalingPromptsForm from "@/components/journal/journaling-prompts-form"
 import DailyCheckinsForm from "@/components/journal/daily-checkins-form"
 import ChallengesStreaksForm from "@/components/journal/challenges-streaks-form"
+import { Navigation } from "@/components/Navigation"
 
 export default function CreateEntryPage() {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const [selectedCategory, setSelectedCategory] = useState("mood-feelings")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [marketplaceTemplates, setMarketplaceTemplates] = useState<MarketplaceTemplate[]>([])
 
   // Check if there's a template query parameter
   const [searchParams, setSearchParams] = useState(() => {
@@ -51,30 +54,20 @@ export default function CreateEntryPage() {
   })
   const templateParam = searchParams.get("template")
 
-  // Marketplace templates the user has subscribed to
-  const marketplaceTemplates = [
-    {
-      id: "curly-hair",
-      name: "Wavy & Curly Hair Journal",
-      icon: <Scissors className="h-5 w-5" />,
-      description: "Track your hair care journey and product results",
-      color: "bg-purple-500",
-    },
-    {
-      id: "household-chores",
-      name: "Household Chores Tracker",
-      icon: <Home className="h-5 w-5" />,
-      description: "Track who does what at home",
-      color: "bg-green-500",
-    },
-    {
-      id: "water-intake",
-      name: "Daily Water Intake",
-      icon: <Droplet className="h-5 w-5" />,
-      description: "Track and improve your hydration",
-      color: "bg-blue-500",
-    },
-  ]
+  // Load marketplace templates
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        const templates = await getPublicTemplates()
+        setMarketplaceTemplates(templates)
+      } catch (err) {
+        console.error('Error loading marketplace templates:', err)
+        setError('Failed to load marketplace templates')
+      }
+    }
+
+    loadTemplates()
+  }, [])
 
   // If a template is specified in the URL, show it first
   useEffect(() => {
@@ -85,125 +78,77 @@ export default function CreateEntryPage() {
         setSelectedCategory(`marketplace-${templateParam}`)
       }
     }
-  }, [templateParam])
+  }, [templateParam, marketplaceTemplates])
 
-  const handleGoalSubmit = (data: { content: string; category: string; type: string; metadata: any }) => {
-    const form = document.querySelector('form')
-    if (!form) return
-
-    // Add hidden inputs with the goal data
-    const contentInput = document.createElement('input')
-    contentInput.type = 'hidden'
-    contentInput.name = 'content'
-    contentInput.value = data.content
-    form.appendChild(contentInput)
-
-    const categoryInput = document.createElement('input')
-    categoryInput.type = 'hidden'
-    categoryInput.name = 'category'
-    categoryInput.value = data.category
-    form.appendChild(categoryInput)
-
-    const typeInput = document.createElement('input')
-    typeInput.type = 'hidden'
-    typeInput.name = 'type'
-    typeInput.value = data.type
-    form.appendChild(typeInput)
-
-    const metadataInput = document.createElement('input')
-    metadataInput.type = 'hidden'
-    metadataInput.name = 'metadata'
-    metadataInput.value = JSON.stringify(data.metadata)
-    form.appendChild(metadataInput)
-
-    // Submit the form
-    form.requestSubmit()
-  }
-
-  const handleTrackingLogsSubmit = async (data: {
+  const handleGoalSubmit = async (data: { 
     title: string
     content: string
-    trackingType: string
+    trackingType: "habit" | "fitness" | "nutrition" | "sleep" | "mood" | "finance" | "productivity" | "custom"
     isGoalTracking: boolean
     linkedGoalId: string
-    metrics: any[]
-    targetProgress: any[]
+    metrics: Array<{
+      name: string
+      value: string
+      unit: string
+      unitType: string
+      unitSystem: "metric" | "imperial"
+      secondaryValue?: string
+      secondaryUnit?: string
+      notes?: string
+    }>
+    targetProgress: Array<{
+      targetId: string
+      value: string
+      secondaryValue: string
+      notes: string
+    }>
   }) => {
-    try {
-      setSubmitting(true)
-      setError(null)
+    return new Promise<void>((resolve, reject) => {
+      try {
+        const form = document.querySelector('form')
+        if (!form) {
+          reject(new Error('Form not found'))
+          return
+        }
 
-      // Get the user's journals
-      const journals = await getUserJournals(user!.uid)
-      if (!journals || journals.length === 0) {
-        // Create a default journal if none exists
-        const defaultJournal = await createJournal({
-          userId: user!.uid,
-          name: "My Journal",
-          description: "My personal journal",
-          isActive: true,
-          isArchived: false,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          settings: {
-            isPrivate: true,
-            allowComments: false,
-            allowSharing: false
-          }
+        // Add hidden inputs with the tracking data
+        const contentInput = document.createElement('input')
+        contentInput.type = 'hidden'
+        contentInput.name = 'content'
+        contentInput.value = data.content
+        form.appendChild(contentInput)
+
+        const categoryInput = document.createElement('input')
+        categoryInput.type = 'hidden'
+        categoryInput.name = 'category'
+        categoryInput.value = 'tracking-logs'
+        form.appendChild(categoryInput)
+
+        const typeInput = document.createElement('input')
+        typeInput.type = 'hidden'
+        typeInput.name = 'type'
+        typeInput.value = data.trackingType
+        form.appendChild(typeInput)
+
+        const metadataInput = document.createElement('input')
+        metadataInput.type = 'hidden'
+        metadataInput.name = 'metadata'
+        metadataInput.value = JSON.stringify({
+          title: data.title,
+          isGoalTracking: data.isGoalTracking,
+          linkedGoalId: data.linkedGoalId,
+          metrics: data.metrics,
+          targetProgress: data.targetProgress
         })
-        if (!defaultJournal.id) {
-          throw new Error("Failed to create default journal")
-        }
-        await createEntry({
-          userId: user!.uid,
-          journalId: defaultJournal.id,
-          content: data.content,
-          category: "tracking-logs",
-          type: "tracking",
-          metadata: {
-            title: data.title,
-            trackingType: data.trackingType,
-            isGoalTracking: data.isGoalTracking,
-            linkedGoalId: data.linkedGoalId,
-            metrics: data.metrics,
-            targetProgress: data.targetProgress,
-          },
-          createdAt: new Date(),
-          updatedAt: new Date()
-        })
-      } else {
-        // Use the first non-archived journal
-        const activeJournal = journals.find(j => !j.isArchived)
-        if (!activeJournal || !activeJournal.id) {
-          throw new Error("No active journal found")
-        }
-        await createEntry({
-          userId: user!.uid,
-          journalId: activeJournal.id,
-          content: data.content,
-          category: "tracking-logs",
-          type: "tracking",
-          metadata: {
-            title: data.title,
-            trackingType: data.trackingType,
-            isGoalTracking: data.isGoalTracking,
-            linkedGoalId: data.linkedGoalId,
-            metrics: data.metrics,
-            targetProgress: data.targetProgress,
-          },
-          createdAt: new Date(),
-          updatedAt: new Date()
-        })
+        form.appendChild(metadataInput)
+
+        // Submit the form
+        form.requestSubmit()
+        resolve()
+      } catch (error) {
+        reject(error)
       }
-
-      // Redirect to the journal page
-      router.push("/journal")
-    } catch (error) {
-      console.error("Error creating entry:", error)
-      setError("Failed to create entry. Please try again.")
-    } finally {
-      setSubmitting(false)
-    }
+    })
   }
 
   const categories = [
@@ -219,7 +164,7 @@ export default function CreateEntryPage() {
       name: "Tracking & Logs",
       icon: <BarChart2 className="h-5 w-5" />,
       description: "Log and track habits, activities, and metrics with customizable fields.",
-      component: <TrackingLogsForm onSubmit={handleTrackingLogsSubmit} />,
+      component: <TrackingLogsForm onSubmit={handleGoalSubmit} />,
     },
     {
       id: "gratitude-reflection",
@@ -266,13 +211,43 @@ export default function CreateEntryPage() {
       icon: template.icon,
       description: template.description,
       component: (
-        <Card className="border-2 border-dashed p-6 flex flex-col items-center justify-center text-center">
-          <div className={`${template.color} text-white p-3 rounded-full mb-4`}>{template.icon}</div>
-          <h3 className="text-lg font-medium mb-2">{template.name}</h3>
-          <p className="text-muted-foreground mb-4">{template.description}</p>
-          <Button asChild>
-            <Link href={`/journal/templates/${template.id}`}>Open Template</Link>
-          </Button>
+        <Card className="border-2 border-dashed">
+          <CardContent className="p-6">
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold">How It Works</h2>
+                <p className="text-muted-foreground">Get started with your {template.name.toLowerCase()} in minutes</p>
+              </div>
+
+              <Tabs defaultValue="setup" className="w-full">
+                <TabsList className="w-full grid grid-cols-3">
+                  <TabsTrigger value="setup">Setup</TabsTrigger>
+                  <TabsTrigger value="tracking">Tracking</TabsTrigger>
+                  <TabsTrigger value="reports">Reports</TabsTrigger>
+                </TabsList>
+
+                <div className="mt-6 space-y-6">
+                  {template.howItWorks.tabs.map((tab, index) => (
+                    <div key={tab.title} className="flex gap-4">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-medium">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-lg">{tab.title}</h3>
+                        <p className="text-muted-foreground">{tab.content}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Tabs>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <Button asChild>
+                <Link href={`/admin/templates/${template.id}`}>Open Template</Link>
+              </Button>
+            </div>
+          </CardContent>
         </Card>
       ),
     })),
@@ -287,6 +262,8 @@ export default function CreateEntryPage() {
     try {
       const formData = new FormData(e.currentTarget)
       const content = formData.get('content') as string
+      const category = formData.get('category') as string
+      const type = formData.get('type') as string
       const metadata = JSON.parse(formData.get('metadata') as string || '{}')
 
       // Get or create default journal
@@ -314,11 +291,10 @@ export default function CreateEntryPage() {
         throw new Error('Failed to get or create journal')
       }
 
-      // Ensure category and type are set correctly
-      const entryData = {
+      const data = {
         content,
-        category: selectedCategory, // Use the selected category from tabs
-        type: selectedCategory, // Use the full category name for type
+        category,
+        type,
         userId: user.uid,
         journalId: journal.id,
         createdAt: new Date(),
@@ -326,12 +302,20 @@ export default function CreateEntryPage() {
         metadata
       }
 
-      console.log('Creating entry with data:', entryData)
-      await createEntry(entryData)
+      console.log('Creating entry with data:', data)
+      await createEntry(data)
       router.push('/journal/browse')
     } catch (error) {
       console.error('Error creating entry:', error)
       alert('Failed to create entry. Please try again.')
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch (error) {
+      console.error('Error signing out:', error)
     }
   }
 
@@ -342,17 +326,7 @@ export default function CreateEntryPage() {
           <Edit3 className="h-5 w-5" />
           <span>JournalMind</span>
         </Link>
-        <nav className="ml-auto flex gap-2">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal">Dashboard</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal/browse">Journal</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/marketplace">Marketplace</Link>
-          </Button>
-        </nav>
+        <Navigation onLogout={handleLogout} />
       </header>
       <main className="flex-1 p-6 md:p-8 lg:p-10">
         <div className="mx-auto max-w-4xl space-y-8">
@@ -411,12 +385,12 @@ export default function CreateEntryPage() {
               <Card>
                 <CardContent className="p-6">
                   {selectedCategoryData?.component}
+                  <div className="mt-6 flex justify-end">
+                    <Button type="submit" className="w-full sm:w-auto">
+                      Create Entry
+                    </Button>
+                  </div>
                 </CardContent>
-                <CardFooter className="flex justify-end p-6 pt-0">
-                  <Button type="submit" disabled={submitting}>
-                    {submitting ? "Saving..." : "Save Entry"}
-                  </Button>
-                </CardFooter>
               </Card>
             </Tabs>
           </form>

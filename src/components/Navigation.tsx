@@ -2,12 +2,15 @@ import React from "react"
 import Link from "next/link"
 import { LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useAuth } from "@/lib/firebase/auth"
 
 interface NavigationProps {
   onLogout: () => Promise<void>
 }
 
 export function Navigation({ onLogout }: NavigationProps) {
+  const { hasRole } = useAuth()
+
   return (
     <nav className="ml-auto flex gap-2">
       <Button variant="ghost" size="sm" asChild>
@@ -22,9 +25,11 @@ export function Navigation({ onLogout }: NavigationProps) {
       <Button variant="ghost" size="sm" asChild>
         <Link href="/marketplace">Marketplace</Link>
       </Button>
-      <Button variant="ghost" size="sm" asChild>
-        <Link href="/admin/templates">Admin</Link>
-      </Button>
+      {hasRole('admin') && (
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/admin/templates">Admin</Link>
+        </Button>
+      )}
       <Button 
         variant="ghost" 
         size="sm"

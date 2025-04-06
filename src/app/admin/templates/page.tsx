@@ -54,8 +54,9 @@ export default function AdminTemplatesPage() {
     const loadTemplates = async () => {
       try {
         setIsLoading(true)
-        const templates = await getTemplates()
-        setTemplates(templates)
+        const loadedTemplates = await getTemplates()
+        console.log('Loaded templates:', loadedTemplates)
+        setTemplates(loadedTemplates)
       } catch (err) {
         console.error('Error loading templates:', err)
         setError('Failed to load templates')
@@ -80,11 +81,20 @@ export default function AdminTemplatesPage() {
   }, [shouldRedirect, router])
 
   const handleDelete = async (templateId: string) => {
+    console.log('Attempting to delete template with ID:', templateId)
+    if (!templateId) {
+      console.error('No template ID provided')
+      return
+    }
+
     if (!confirm('Are you sure you want to delete this template?')) return
 
     try {
+      console.log('Deleting template...')
       await deleteTemplate(templateId)
+      console.log('Template deleted, updating UI...')
       setTemplates(templates.filter(t => t.id !== templateId))
+      console.log('UI updated')
     } catch (err) {
       console.error('Error deleting template:', err)
       setError('Failed to delete template')
@@ -144,9 +154,9 @@ export default function AdminTemplatesPage() {
                       </TableCell>
                       <TableCell>
                         <Badge
-                          variant={template.isActive ? "default" : "destructive"}
+                          variant={template.settings.active ? "default" : "destructive"}
                         >
-                          {template.isActive ? "Active" : "Inactive"}
+                          {template.settings.active ? "Active" : "Inactive"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">

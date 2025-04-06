@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/lib/firebase/auth"
 import { getAllAffirmations, saveAffirmation, updateAffirmation, deleteAffirmation } from "@/lib/firebase/affirmations"
 import type { Affirmation, AffirmationCategory } from "@/lib/firebase/types"
+import { Navigation } from "@/components/Navigation"
 
 const CATEGORIES: AffirmationCategory[] = [
   "confidence",
@@ -41,13 +42,15 @@ const CATEGORIES: AffirmationCategory[] = [
   "love",
   "success",
   "freedom",
-  "healing",
-  "transformation"
+  "self-discovery",
+  "reflection",
+  "money",
+  "nature"
 ]
 
 export default function AdminAffirmationsPage() {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const [affirmationsList, setAffirmationsList] = useState<Affirmation[]>([])
   const [editingAffirmation, setEditingAffirmation] = useState<Affirmation | null>(null)
   const [newAffirmation, setNewAffirmation] = useState<Partial<Affirmation>>({
@@ -131,6 +134,14 @@ export default function AdminAffirmationsPage() {
     }
   }
 
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -161,14 +172,8 @@ export default function AdminAffirmationsPage() {
           <Edit3 className="h-5 w-5" />
           <span>JournalMind</span>
         </Link>
-        <nav className="ml-auto flex gap-2">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin/templates">Templates</Link>
-          </Button>
-          <Button variant="ghost" size="sm" className="bg-primary/10" asChild>
-            <Link href="/admin/affirmations">Affirmations</Link>
-          </Button>
-        </nav>
+        <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">Admin</span>
+        <Navigation onLogout={handleLogout} />
       </header>
 
       <main className="flex-1 p-6">

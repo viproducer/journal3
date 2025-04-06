@@ -1,8 +1,10 @@
 import Link from "next/link"
 import { Edit3, Heart, BarChart2, Star, Target, Compass, HelpCircle, Sun, Zap } from "lucide-react"
+import { useAuth } from "@/lib/firebase/auth"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Navigation } from "@/components/Navigation"
 
 export default function CategoryFormsPage() {
   const categories = [
@@ -103,6 +105,16 @@ export default function CategoryFormsPage() {
     },
   ]
 
+  const { logout } = useAuth()
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background px-6">
@@ -110,14 +122,7 @@ export default function CategoryFormsPage() {
           <Edit3 className="h-5 w-5" />
           <span>JournalMind</span>
         </Link>
-        <nav className="ml-auto flex gap-2">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal">Dashboard</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal">Journal</Link>
-          </Button>
-        </nav>
+        <Navigation onLogout={handleLogout} />
       </header>
       <main className="flex-1 p-6 md:p-8 lg:p-10">
         <div className="mx-auto max-w-6xl space-y-8">

@@ -780,14 +780,13 @@ export default function DashboardPage() {
                               if (!user) return;
                               if (window.confirm('Are you sure you want to delete this entry?')) {
                                 try {
-                                  const journalId = localStorage.getItem('currentJournalId')
-                                  if (!journalId) {
-                                    console.error('No journal ID found')
+                                  if (!entry.journalId) {
+                                    console.error('No journal ID found in entry')
                                     return
                                   }
                                   
                                   setLoading(true)
-                                  await deleteJournalEntry(user.uid, journalId, entry.id!)
+                                  await deleteJournalEntry(user.uid, entry.journalId, entry.id!)
                                   // Reload the page to refresh all data
                                   window.location.reload()
                                 } catch (err) {

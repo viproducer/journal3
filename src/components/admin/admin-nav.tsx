@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Edit3, LogOut } from "lucide-react"
 import { useAuth } from "@/lib/firebase/auth"
+import { Navigation } from "@/components/Navigation"
 
 const navItems = [
   {
@@ -48,30 +49,8 @@ export function AdminNav() {
         <Edit3 className="h-5 w-5" />
         <span>JournalMind</span>
       </Link>
-      <nav className="ml-auto flex gap-2">
-        {navItems.map((item) => (
-          <Button
-            key={item.href}
-            variant="ghost"
-            size="sm"
-            asChild
-            className={cn(
-              pathname === item.href && "bg-accent"
-            )}
-          >
-            <Link href={item.href}>{item.title}</Link>
-          </Button>
-        ))}
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={handleLogout}
-          className="text-red-500 hover:text-red-600 hover:bg-red-50"
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Logout
-        </Button>
-      </nav>
+      <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">Admin</span>
+      <Navigation onLogout={handleLogout} />
     </header>
   )
 } 

@@ -72,7 +72,7 @@ export interface JournalType {
   name: string;
   description: string;
   fields: MarketplaceTemplateField[];
-  prompts: string[];
+  prompts?: string[];
   icon?: string;
   color?: string;
 }
@@ -86,6 +86,15 @@ export interface MarketplaceTemplate {
   features: string[];
   tags: string[];
   journalTypes: JournalType[];
+  icon: string;
+  color: string;
+  howItWorks: {
+    tabs: Array<{
+      title: string;
+      content: string;
+      icon?: string;
+    }>;
+  };
   settings: {
     active: boolean;
     public: boolean;

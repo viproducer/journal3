@@ -225,17 +225,17 @@ export async function createEntry(entryData: Omit<JournalEntry, 'id'>) {
     // For goals, ensure consistent category and type
     const isGoal = entryData.metadata?.goalStatement || entryData.metadata?.goalWhy;
     
-    // Ensure category and type are stored at root level and in metadata
+    // Set category and type at root level
+    const category = isGoal ? 'goals-intentions' : (entryData.category || entryData.metadata?.category || 'general');
+    const type = isGoal ? 'goals-intentions' : (entryData.type || entryData.metadata?.type || 'entry');
+    
+    // Create entry without duplicating category and type in metadata
     const entryToSave = {
       ...entryData,
-      // For goals, always use goals-intentions
-      category: isGoal ? 'goals-intentions' : (entryData.category || entryData.metadata?.category || 'general'),
-      type: isGoal ? 'goals-intentions' : (entryData.type || entryData.metadata?.type || 'entry'),
+      category,
+      type,
       metadata: {
-        ...entryData.metadata,
-        // Ensure metadata has the same category and type
-        category: isGoal ? 'goals-intentions' : (entryData.category || entryData.metadata?.category || 'general'),
-        type: isGoal ? 'goals-intentions' : (entryData.type || entryData.metadata?.type || 'entry')
+        ...entryData.metadata
       },
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now()
@@ -427,14 +427,19 @@ export async function deleteJournalEntry(userId: string, journalId: string, entr
     const entryRef = getJournalEntryRef(userId, journalId, entryId);
     const journalRef = doc(getUserJournalsCollection(userId), journalId);
 
-    // Delete the entry and update journal stats
-    await Promise.all([
-      deleteDoc(entryRef),
-      updateDoc(journalRef, {
+    // First check if the journal exists
+    const journalDoc = await getDoc(journalRef);
+    
+    // Delete the entry
+    await deleteDoc(entryRef);
+
+    // Only update journal stats if the journal exists
+    if (journalDoc.exists()) {
+      await updateDoc(journalRef, {
         'stats.totalEntries': increment(-1),
         updatedAt: Timestamp.now()
-      })
-    ]);
+      });
+    }
   } catch (error) {
     console.error('Error deleting journal entry:', error);
     throw error;

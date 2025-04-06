@@ -37,6 +37,7 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getCategoryStyles, formatCategoryName } from "@/lib/constants"
+import { Navigation } from "@/components/Navigation"
 
 const VIEW_OPTIONS = {
   DIARY: 'diary',
@@ -269,9 +270,8 @@ export default function BrowseJournalPage() {
   const handleLogout = async () => {
     try {
       await logout()
-      router.replace('/auth/signin')
-    } catch (err) {
-      console.error('Failed to log out')
+    } catch (error) {
+      console.error('Error signing out:', error)
     }
   }
 
@@ -328,32 +328,7 @@ export default function BrowseJournalPage() {
           <Edit3 className="h-5 w-5" />
           <span>JournalMind</span>
         </Link>
-        <nav className="ml-auto flex gap-2">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal">Dashboard</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal/browse">Journal</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/goals">Goals</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/marketplace">Marketplace</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin/templates">Admin</Link>
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={handleLogout}
-            className="text-red-500 hover:text-red-600 hover:bg-red-50"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
-        </nav>
+        <Navigation onLogout={handleLogout} />
       </header>
 
       <div className="container mx-auto py-8 px-4">
@@ -527,14 +502,13 @@ export default function BrowseJournalPage() {
                           if (!user) return;
                           if (window.confirm('Are you sure you want to delete this entry?')) {
                             try {
-                              const journalId = localStorage.getItem('currentJournalId')
-                              if (!journalId) {
-                                console.error('No journal ID found')
+                              if (!entry.journalId) {
+                                console.error('No journal ID found in entry')
                                 return
                               }
                               
                               setLoading(true)
-                              await deleteJournalEntry(user.uid, journalId, entry.id!)
+                              await deleteJournalEntry(user.uid, entry.journalId, entry.id!)
                               await refreshEntries()
                             } catch (err) {
                               console.error('Error deleting entry:', err)

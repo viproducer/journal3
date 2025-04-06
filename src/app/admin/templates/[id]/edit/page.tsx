@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { use } from 'react'
 import { useAuth } from '@/lib/firebase/auth'
-import type { MarketplaceTemplate } from '@/lib/firebase/types'
+import type { MarketplaceTemplate, MarketplaceTemplateField } from '@/lib/firebase/types'
 import { getTemplate, updateTemplate } from '@/lib/firebase/templates'
 import Link from "next/link"
 import {
@@ -55,12 +55,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { IconSelector } from "@/components/IconSelector"
+import { Navigation } from "@/components/Navigation"
 
 interface EditTemplatePageProps {
   params: Promise<{ id: string }>
 }
-
-type TemplateField = MarketplaceTemplate['fields'][number]
 
 interface NewField {
   id: string;
@@ -73,16 +73,22 @@ interface NewField {
   description?: string;
 }
 
+interface HowItWorksTab {
+  icon: string;
+  title: string;
+  content: string;
+}
+
 export default function EditTemplatePage({ params }: EditTemplatePageProps) {
   const router = useRouter()
-  const { user, loading, hasRole } = useAuth()
+  const { user, loading, hasRole, logout } = useAuth()
   const [activeTab, setActiveTab] = useState("basic-info")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [template, setTemplate] = useState<MarketplaceTemplate | null>(null)
   const [previewMode, setPreviewMode] = useState(false)
   const [showAddField, setShowAddField] = useState(false)
-  const [editingField, setEditingField] = useState<TemplateField | null>(null)
+  const [editingField, setEditingField] = useState<MarketplaceTemplateField | null>(null)
   const [newField, setNewField] = useState<NewField>({
     id: "",
     name: "",
@@ -94,9 +100,14 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
     description: ""
   })
   const [newOption, setNewOption] = useState("")
-  const [fields, setFields] = useState<TemplateField[]>([])
   const [newFeature, setNewFeature] = useState("")
   const [newTag, setNewTag] = useState("")
+  const [showHowItWorksForm, setShowHowItWorksForm] = useState(false)
+  const [newHowItWorksTab, setNewHowItWorksTab] = useState<HowItWorksTab>({
+    icon: "📝",
+    title: "",
+    content: ""
+  })
   
   const resolvedParams = use(params)
 
@@ -120,12 +131,8 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
 
     const loadTemplate = async () => {
       try {
-        const template = await getTemplate(resolvedParams.id)
-        setTemplate(template)
-        // Initialize fields from template data if they exist
-        if (template.fields) {
-          setFields(template.fields)
-        }
+        const loadedTemplate = await getTemplate(resolvedParams.id)
+        setTemplate(loadedTemplate)
       } catch (err) {
         console.error('Error loading template:', err)
         setError('Failed to load template')
@@ -148,9 +155,11 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
 
       await updateTemplate(resolvedParams.id, {
         ...template,
-        fields,
         updatedAt: new Date(),
         settings: {
+          ...template.settings,
+          active: template.settings?.active ?? true,
+          public: template.settings?.public ?? true,
           allowCustomization: template.settings?.allowCustomization ?? true,
           requireApproval: template.settings?.requireApproval ?? false,
           maxEntries: template.settings?.maxEntries ?? 100
@@ -172,7 +181,7 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
       return
     }
 
-    const fieldToAdd: TemplateField = {
+    const fieldToAdd: MarketplaceTemplateField = {
       ...newField,
       id: editingField ? editingField.id : crypto.randomUUID(),
       options: newField.options || [],
@@ -180,11 +189,21 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
       description: newField.description || ""
     }
 
+    const updatedJournalTypes = template.journalTypes.map(journalType => {
+      if (journalType.id === activeTab) {
+        return {
+          ...journalType,
+          fields: editingField
+            ? journalType.fields.map(f => f.id === editingField.id ? fieldToAdd : f)
+            : [...journalType.fields, fieldToAdd]
+        }
+      }
+      return journalType
+    })
+
     setTemplate({
       ...template,
-      fields: editingField 
-        ? template.fields.map(f => f.id === editingField.id ? fieldToAdd : f)
-        : [...template.fields, fieldToAdd]
+      journalTypes: updatedJournalTypes
     })
 
     setNewField({
@@ -201,7 +220,7 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
     setShowAddField(false)
   }
 
-  const handleEditField = (field: TemplateField) => {
+  const handleEditField = (field: MarketplaceTemplateField) => {
     setEditingField(field)
     setNewField({
       id: field.id,
@@ -218,64 +237,80 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
 
   const handleRemoveField = (fieldId: string) => {
     if (!template) return
+    const updatedJournalTypes = template.journalTypes.map(journalType => {
+      if (journalType.id === activeTab) {
+        return {
+          ...journalType,
+          fields: journalType.fields.filter(field => field.id !== fieldId)
+        }
+      }
+      return journalType
+    })
+
     setTemplate({
       ...template,
-      fields: template.fields.filter((field) => field.id !== fieldId)
+      journalTypes: updatedJournalTypes
     })
   }
 
   const handleAddOption = () => {
-    const options = newField.options || [];
-    if (newOption && !options.includes(newOption)) {
+    if (!newOption || !newField.options) return
+    if (!newField.options.includes(newOption)) {
       setNewField({
         ...newField,
-        options: [...options, newOption],
+        options: [...newField.options, newOption],
       });
       setNewOption('');
     }
   }
 
   const handleRemoveOption = (option: string) => {
+    if (!newField.options) return
     setNewField({
       ...newField,
-      options: newField.options.filter((item) => item !== option),
+      options: newField.options.filter((item: string) => item !== option),
     })
   }
 
   const addFeature = () => {
     if (!newFeature || !template) return
+    const updatedFeatures = [...(template.features || []), newFeature]
     setTemplate({
       ...template,
-      features: [...template.features, newFeature]
+      features: updatedFeatures
     })
-    setNewFeature("")
+    setNewFeature('')
   }
 
   const removeFeature = (index: number) => {
     if (!template) return
-    const newFeatures = [...template.features]
-    newFeatures.splice(index, 1)
-    setTemplate({ ...template, features: newFeatures })
+    const updatedFeatures = template.features.filter((_, i) => i !== index)
+    setTemplate({
+      ...template,
+      features: updatedFeatures
+    })
   }
 
   const addTag = () => {
     if (!newTag || !template) return
-    const tag = newTag.toLowerCase()
+    const updatedTags = [...(template.tags || []), newTag]
     setTemplate({
       ...template,
-      tags: [...template.tags, tag]
+      tags: updatedTags
     })
-    setNewTag("")
+    setNewTag('')
   }
 
   const removeTag = (index: number) => {
     if (!template) return
-    const newTags = [...template.tags]
-    newTags.splice(index, 1)
-    setTemplate({ ...template, tags: newTags })
+    const updatedTags = template.tags.filter((_, i) => i !== index)
+    setTemplate({
+      ...template,
+      tags: updatedTags
+    })
   }
 
-  const PreviewField = ({ field }: { field: TemplateField }) => {
+  const PreviewField = ({ field }: { field: MarketplaceTemplateField }) => {
     switch (field.type) {
       case "text":
         return (
@@ -321,6 +356,51 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
     }
   }
 
+  const addHowItWorksTab = () => {
+    if (!template || !newHowItWorksTab.title || !newHowItWorksTab.content) return
+    setTemplate({
+      ...template,
+      howItWorks: {
+        tabs: [...(template.howItWorks?.tabs || []), newHowItWorksTab]
+      }
+    })
+    setNewHowItWorksTab({
+      icon: "📝",
+      title: "",
+      content: ""
+    })
+  }
+
+  const removeHowItWorksTab = (index: number) => {
+    if (!template) return
+    setTemplate({
+      ...template,
+      howItWorks: {
+        tabs: template.howItWorks?.tabs.filter((_, i) => i !== index) || []
+      }
+    })
+  }
+
+  const updateHowItWorksTab = (index: number, updates: Partial<HowItWorksTab>) => {
+    if (!template) return
+    setTemplate({
+      ...template,
+      howItWorks: {
+        tabs: template.howItWorks?.tabs.map((tab, i) =>
+          i === index ? { ...tab, ...updates } : tab
+        ) || []
+      }
+    })
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
+  }
+
   if (loading || !template) {
     return <div className="flex items-center justify-center min-h-screen">
       <p className="text-lg">Loading...</p>
@@ -340,23 +420,7 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
           <span>JournalMind</span>
         </Link>
         <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">Admin</span>
-        <nav className="ml-auto flex gap-2">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal">Dashboard</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal">Journal</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin/templates">Templates</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin/users">Users</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin/analytics">Analytics</Link>
-          </Button>
-        </nav>
+        <Navigation onLogout={handleLogout} />
       </header>
 
       <main className="flex-1 p-6 md:p-8 lg:p-10">
@@ -400,13 +464,20 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
                 <p className="text-gray-600 mb-6">{template.description}</p>
                 
                 <div className="space-y-6">
-                  {template.fields.map((field) => (
-                    <div key={field.id} className="space-y-2">
-                      <Label>{field.label}</Label>
-                      {field.description && (
-                        <p className="text-sm text-gray-500 mb-2">{field.description}</p>
-                      )}
-                      <PreviewField field={field} />
+                  {template.journalTypes.map(journalType => (
+                    <div key={journalType.id} className="space-y-4">
+                      <h3 className="text-lg font-medium">{journalType.name}</h3>
+                      <div className="space-y-4">
+                        {journalType.fields.map((field: MarketplaceTemplateField) => (
+                          <div key={field.id} className="space-y-2">
+                            <Label>{field.label}</Label>
+                            {field.description && (
+                              <p className="text-sm text-gray-500 mb-2">{field.description}</p>
+                            )}
+                            <PreviewField field={field} />
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -536,6 +607,68 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
                         ))}
                       </div>
                     </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <Label>How It Works</Label>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Add steps to explain how to use your template
+                        </p>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        {template.howItWorks?.tabs.map((tab, index) => (
+                          <Card key={index}>
+                            <CardContent className="pt-6">
+                              <div className="flex items-start justify-between">
+                                <div className="space-y-4 flex-1">
+                                  <div className="flex items-center gap-4">
+                                    <div className="flex-shrink-0">
+                                      <IconSelector
+                                        value={tab.icon || "📝"}
+                                        onChange={(icon) => updateHowItWorksTab(index, { icon })}
+                                      />
+                                    </div>
+                                    <div className="flex-1">
+                                      <Label>Title</Label>
+                                      <Input
+                                        value={tab.title}
+                                        onChange={(e) => updateHowItWorksTab(index, { title: e.target.value })}
+                                        placeholder="e.g., Setup"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <Label>Content</Label>
+                                    <Textarea
+                                      value={tab.content}
+                                      onChange={(e) => updateHowItWorksTab(index, { content: e.target.value })}
+                                      placeholder="Explain this step..."
+                                    />
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeHowItWorksTab(index)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowHowItWorksForm(true)}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Step
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -568,12 +701,12 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {template.fields.length === 0 ? (
+                    {template.journalTypes.length === 0 ? (
                       <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
                         <Layers className="h-10 w-10 text-muted-foreground/60" />
-                        <h3 className="mt-4 text-lg font-medium">No fields yet</h3>
+                        <h3 className="mt-4 text-lg font-medium">No journal types yet</h3>
                         <p className="mt-2 text-sm text-muted-foreground max-w-sm">
-                          Start building your template by adding fields for users to fill out.
+                          Start building your template by adding journal types and fields for users to fill out.
                         </p>
                         <Button className="mt-4" onClick={() => {
                           setEditingField(null)
@@ -595,60 +728,36 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {template.fields.map((field) => (
-                          <Card key={field.id}>
-                            <CardHeader className="p-4">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  {fieldTypes.find((type) => type.id === field.type)?.icon}
+                        {template.journalTypes.map(journalType => (
+                          <div key={journalType.id} className="space-y-4">
+                            <h3 className="text-lg font-medium">{journalType.name}</h3>
+                            <div className="space-y-4">
+                              {journalType.fields.map((field: MarketplaceTemplateField) => (
+                                <div key={field.id} className="flex items-center justify-between p-4 bg-white rounded-lg shadow">
                                   <div>
-                                    <div className="flex items-center gap-2">
-                                      <CardTitle className="text-base">{field.label}</CardTitle>
-                                      {field.required && (
-                                        <Badge variant="outline" className="text-red-500 border-red-500">
-                                          Required
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">{field.name}</p>
-                                    {field.description && (
-                                      <p className="text-sm text-muted-foreground mt-1">{field.description}</p>
-                                    )}
+                                    <h4 className="font-medium">{field.label}</h4>
+                                    <p className="text-sm text-gray-500">{field.type}</p>
+                                  </div>
+                                  <div className="flex space-x-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleEditField(field)}
+                                    >
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => handleRemoveField(field.id)}
+                                    >
+                                      Remove
+                                    </Button>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    onClick={() => handleEditField(field)}
-                                    className="flex items-center gap-1"
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                    Edit
-                                  </Button>
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm"
-                                    onClick={() => handleRemoveField(field.id)}
-                                    className="flex items-center gap-1 text-red-500 hover:text-red-600"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                    Delete
-                                  </Button>
-                                </div>
-                              </div>
-                              {(field.type === "select" || field.type === "multiselect") && field.options && field.options.length > 0 && (
-                                <div className="mt-4 border-t pt-4">
-                                  <p className="text-sm font-medium mb-2">Options:</p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {field.options.map((option, optionIndex) => (
-                                      <Badge key={optionIndex} variant="secondary">{option}</Badge>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </CardHeader>
-                          </Card>
+                              ))}
+                            </div>
+                          </div>
                         ))}
                       </div>
                     )}
@@ -812,8 +921,14 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
                       </div>
                       <Switch
                         id="isActive"
-                        checked={template.isActive}
-                        onCheckedChange={(checked) => setTemplate({ ...template, isActive: checked })}
+                        checked={template.settings.active}
+                        onCheckedChange={(checked) => setTemplate({
+                          ...template,
+                          settings: {
+                            ...template.settings,
+                            active: checked
+                          }
+                        })}
                       />
                     </div>
 
@@ -828,8 +943,14 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
                       </div>
                       <Switch
                         id="isPublic"
-                        checked={template.isPublic}
-                        onCheckedChange={(checked) => setTemplate({ ...template, isPublic: checked })}
+                        checked={template.settings.public}
+                        onCheckedChange={(checked) => setTemplate({
+                          ...template,
+                          settings: {
+                            ...template.settings,
+                            public: checked
+                          }
+                        })}
                       />
                     </div>
 

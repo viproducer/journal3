@@ -36,6 +36,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { IconSelector } from "@/components/IconSelector"
 
 const STEPS = [
   {
@@ -94,7 +95,6 @@ export default function NewTemplatePage() {
   const [showFieldForm, setShowFieldForm] = useState(false)
   const [newFeature, setNewFeature] = useState("")
   const [newTag, setNewTag] = useState("")
-  const [newPrompt, setNewPrompt] = useState("")
   const [newField, setNewField] = useState<MarketplaceTemplateField>({
     id: "",
     name: "",
@@ -107,16 +107,13 @@ export default function NewTemplatePage() {
     customOptions: []
   })
   const [newOption, setNewOption] = useState("")
-
   const [shouldRedirect, setShouldRedirect] = useState(false)
-
   const [showJournalTypeForm, setShowJournalTypeForm] = useState(false)
   const [newJournalType, setNewJournalType] = useState<JournalType>({
     id: "",
     name: "",
     description: "",
     fields: [],
-    prompts: [],
     icon: "📝",
     color: "#4F46E5"
   })
@@ -128,17 +125,40 @@ export default function NewTemplatePage() {
     price: 0,
     features: [],
     tags: [],
-    journalTypes: [],
-    prompts: [],
-    fields: [],
+    howItWorks: {
+      tabs: [
+        {
+          title: "Setup",
+          content: "Start by setting up your journal and customizing it to your needs.",
+          icon: "🎯"
+        },
+        {
+          title: "Track",
+          content: "Log your entries and track your progress over time.",
+          icon: "📝"
+        },
+        {
+          title: "Monitor",
+          content: "View your progress, analyze patterns, and adjust as needed.",
+          icon: "📊"
+        }
+      ]
+    },
     settings: {
       active: true,
       public: true,
       allowCustomization: true,
       maxEntries: 100,
       requireApproval: false
-    }
+    },
+    journalTypes: [],
+    icon: "📝",
+    color: "#4F46E5",
   })
+
+  // Add new state for managing tabs
+  const [newTab, setNewTab] = useState({ title: "", content: "", icon: "" })
+  const [showHowItWorksForm, setShowHowItWorksForm] = useState(false)
 
   useEffect(() => {
     if (!loading && (!user || !hasRole('admin'))) {
@@ -156,6 +176,13 @@ export default function NewTemplatePage() {
     e.preventDefault()
     if (!user) return
 
+    // Only proceed with submission if we're on the last step
+    if (currentStep !== STEPS.length - 1) {
+      nextStep()
+      return
+    }
+
+    setSubmitting(true)
     const newTemplate: MarketplaceTemplate = {
       id: "",
       name: template.name || "",
@@ -164,9 +191,10 @@ export default function NewTemplatePage() {
       price: template.price || 0,
       features: template.features || [],
       tags: template.tags || [],
-      prompts: template.prompts || [],
-      fields: template.fields || [],
       journalTypes: template.journalTypes || [],
+      icon: template.icon || "📝",
+      color: template.color || "#4F46E5",
+      howItWorks: template.howItWorks || { tabs: [] },
       settings: {
         active: template.settings?.active ?? true,
         public: template.settings?.public ?? true,
@@ -180,9 +208,12 @@ export default function NewTemplatePage() {
 
     try {
       await createTemplate(newTemplate)
-      setShouldRedirect(true)
+      router.push('/admin/templates')
     } catch (error) {
       console.error("Error creating template:", error)
+      setError("Failed to create template. Please try again.")
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -285,24 +316,10 @@ export default function NewTemplatePage() {
   const removeField = (index: number) => {
     setTemplate({
       ...template,
-      fields: template.fields?.filter((_, i) => i !== index) || []
-    })
-  }
-
-  const addPrompt = () => {
-    if (newPrompt.trim()) {
-      setTemplate({
-        ...template,
-        prompts: [...(template.prompts || []), newPrompt.trim()]
-      })
-      setNewPrompt("")
-    }
-  }
-
-  const removePrompt = (index: number) => {
-    setTemplate({
-      ...template,
-      prompts: template.prompts?.filter((_: string, i: number) => i !== index) || []
+      journalTypes: template.journalTypes?.map(journalType => ({
+        ...journalType,
+        fields: journalType.fields.filter((_, i) => i !== index)
+      })) || []
     })
   }
 
@@ -317,7 +334,6 @@ export default function NewTemplatePage() {
         name: "",
         description: "",
         fields: [],
-        prompts: [],
         icon: "📝",
         color: "#4F46E5"
       })
@@ -349,71 +365,7 @@ export default function NewTemplatePage() {
   const renderStep = () => {
     switch (STEPS[currentStep].id) {
       case "basic":
-  return (
-          <Card>
-          <CardHeader>
-            <CardTitle>Basic Information</CardTitle>
-            <CardDescription>
-                Start by adding the basic details of your template
-            </CardDescription>
-          </CardHeader>
-            <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="name">Template Name</Label>
-              <Input
-                id="name"
-                value={template.name}
-                onChange={(e) => setTemplate({ ...template, name: e.target.value })}
-                  placeholder="e.g., Daily Mood Tracker"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={template.description}
-                onChange={(e) => setTemplate({ ...template, description: e.target.value })}
-                  placeholder="Describe what this template is for and how it helps users"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Select
-                value={template.category}
-                onValueChange={(value) => setTemplate({ ...template, category: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="health">Health & Wellness</SelectItem>
-                  <SelectItem value="productivity">Productivity</SelectItem>
-                  <SelectItem value="personal">Personal Growth</SelectItem>
-                  <SelectItem value="finance">Finance</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="price">Price ($)</Label>
-              <Input
-                id="price"
-                type="number"
-                min="0"
-                step="0.01"
-                value={template.price}
-                onChange={(e) => setTemplate({ ...template, price: parseFloat(e.target.value) })}
-                required
-              />
-            </div>
-          </CardContent>
-        </Card>
-        )
+        return renderBasicInformation()
 
       case "fields":
         return (
@@ -469,20 +421,6 @@ export default function NewTemplatePage() {
                               ))}
                             </div>
                           </div>
-
-                          {/* Prompts for this journal type */}
-                          {journalType.prompts.length > 0 && (
-                            <div className="mt-4">
-                              <h5 className="text-sm font-medium mb-2">Prompts</h5>
-                              <div className="flex flex-wrap gap-1">
-                                {journalType.prompts.map((prompt, promptIndex) => (
-                                  <Badge key={promptIndex} variant="outline" className="text-xs">
-                                    {prompt}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
                         </div>
                         <Button
                           type="button"
@@ -557,87 +495,32 @@ export default function NewTemplatePage() {
                     </div>
                     <div className="space-y-2">
                       <Label>Fields</Label>
-                      <div className="space-y-2">
-                        {newJournalType.fields.map((field, index) => (
-                          <div key={index} className="flex items-center gap-2">
-                            <Badge variant="secondary">{field.type}</Badge>
-                            <span className="text-sm">{field.label}</span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setNewJournalType({
-                                  ...newJournalType,
-                                  fields: newJournalType.fields.filter((_, i) => i !== index)
-                                })
-                              }}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowFieldForm(true)}
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Field
-                      </Button>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Prompts</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Add a prompt..."
-                          value={newPrompt}
-                          onChange={(e) => setNewPrompt(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault()
-                              if (newPrompt.trim()) {
-                                setNewJournalType({
-                                  ...newJournalType,
-                                  prompts: [...newJournalType.prompts, newPrompt.trim()]
-                                })
-                                setNewPrompt("")
-                              }
-                            }
-                          }}
-                        />
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap gap-2">
+                          {newJournalType.fields.map((field, index) => (
+                            <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                              {field.label}
+                              <X
+                                className="h-3 w-3 cursor-pointer"
+                                onClick={() => {
+                                  setNewJournalType({
+                                    ...newJournalType,
+                                    fields: newJournalType.fields.filter((_, i) => i !== index)
+                                  })
+                                }}
+                              />
+                            </Badge>
+                          ))}
+                        </div>
                         <Button
                           type="button"
-                          onClick={() => {
-                            if (newPrompt.trim()) {
-                              setNewJournalType({
-                                ...newJournalType,
-                                prompts: [...newJournalType.prompts, newPrompt.trim()]
-                              })
-                              setNewPrompt("")
-                            }
-                          }}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowFieldForm(true)}
                         >
-                          Add
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add Field
                         </Button>
-                      </div>
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {newJournalType.prompts.map((prompt, index) => (
-                          <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                            {prompt}
-                            <X
-                              className="h-3 w-3 cursor-pointer"
-                              onClick={() => {
-                                setNewJournalType({
-                                  ...newJournalType,
-                                  prompts: newJournalType.prompts.filter((_, i) => i !== index)
-                                })
-                              }}
-                            />
-                          </Badge>
-                        ))}
                       </div>
                     </div>
                   </div>
@@ -807,6 +690,228 @@ export default function NewTemplatePage() {
     }
   }
 
+  const renderBasicInformation = () => {
+    return (
+      <div className="space-y-6">
+        <div className="flex gap-6">
+          <div className="flex-shrink-0">
+            <Label>Icon</Label>
+            <IconSelector
+              value={template.icon || "📝"}
+              onChange={(icon) => setTemplate({ ...template, icon })}
+            />
+          </div>
+          <div className="flex-1 space-y-2">
+            <div>
+              <Label>Name</Label>
+              <Input
+                placeholder="e.g., Daily Mood Tracker"
+                value={template.name}
+                onChange={(e) => setTemplate({ ...template, name: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea
+                placeholder="Describe what your template helps users track..."
+                value={template.description}
+                onChange={(e) => setTemplate({ ...template, description: e.target.value })}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <Label>Category</Label>
+          <Select
+            value={template.category}
+            onValueChange={(value) => setTemplate({ ...template, category: value })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select a category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="health">Health & Wellness</SelectItem>
+              <SelectItem value="fitness">Fitness</SelectItem>
+              <SelectItem value="productivity">Productivity</SelectItem>
+              <SelectItem value="finance">Finance</SelectItem>
+              <SelectItem value="education">Education</SelectItem>
+              <SelectItem value="personal">Personal</SelectItem>
+              <SelectItem value="work">Work</SelectItem>
+              <SelectItem value="challenge">30-Day Challenge</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label>Price</Label>
+          <Input
+            type="number"
+            min="0"
+            placeholder="0"
+            value={template.price}
+            onChange={(e) => setTemplate({ ...template, price: Number(e.target.value) })}
+          />
+        </div>
+
+        <div>
+          <Label>Color Theme</Label>
+          <Input
+            type="color"
+            value={template.color}
+            onChange={(e) => setTemplate({ ...template, color: e.target.value })}
+            className="h-12 w-full"
+          />
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <Label>How It Works</Label>
+            <p className="text-sm text-muted-foreground mb-4">
+              Add steps to explain how to use your template
+            </p>
+          </div>
+          
+          <div className="space-y-4">
+            {template.howItWorks?.tabs.map((tab, index) => (
+              <Card key={index}>
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-4 flex-1">
+                      <div className="flex items-center gap-4">
+                        <div className="flex-shrink-0">
+                          <IconSelector
+                            value={tab.icon || "📝"}
+                            onChange={(icon) => updateHowItWorksTab(index, { icon })}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <Label>Title</Label>
+                          <Input
+                            value={tab.title}
+                            onChange={(e) => updateHowItWorksTab(index, { title: e.target.value })}
+                            placeholder="e.g., Setup"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Content</Label>
+                        <Textarea
+                          value={tab.content}
+                          onChange={(e) => updateHowItWorksTab(index, { content: e.target.value })}
+                          placeholder="Explain this step..."
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeHowItWorksTab(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setShowHowItWorksForm(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Step
+          </Button>
+        </div>
+
+        <Dialog open={showHowItWorksForm} onOpenChange={setShowHowItWorksForm}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add How It Works Step</DialogTitle>
+              <DialogDescription>
+                Add a new step to explain how to use your template
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="flex-shrink-0">
+                  <Label>Icon</Label>
+                  <IconSelector
+                    value={newTab.icon || "📝"}
+                    onChange={(icon) => setNewTab({ ...newTab, icon })}
+                  />
+                </div>
+                <div className="flex-1">
+                  <Label>Title</Label>
+                  <Input
+                    value={newTab.title}
+                    onChange={(e) => setNewTab({ ...newTab, title: e.target.value })}
+                    placeholder="e.g., Setup"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Content</Label>
+                <Textarea
+                  value={newTab.content}
+                  onChange={(e) => setNewTab({ ...newTab, content: e.target.value })}
+                  placeholder="Explain this step..."
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowHowItWorksForm(false)}>
+                Cancel
+              </Button>
+              <Button onClick={() => {
+                addTab()
+                setShowHowItWorksForm(false)
+              }}>
+                Add Step
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    )
+  }
+
+  const addTab = () => {
+    if (!newTab.title || !newTab.content) return
+    setTemplate({
+      ...template,
+      howItWorks: {
+        tabs: [...(template.howItWorks?.tabs || []), newTab]
+      }
+    })
+    setNewTab({ title: "", content: "", icon: "📝" })
+  }
+
+  const removeHowItWorksTab = (index: number) => {
+    if (!template?.howItWorks?.tabs) return
+    setTemplate({
+      ...template,
+      howItWorks: {
+        tabs: template.howItWorks.tabs.filter((_, i) => i !== index)
+      }
+    })
+  }
+
+  const updateHowItWorksTab = (index: number, updates: Partial<{ icon: string; title: string; content: string }>) => {
+    if (!template?.howItWorks?.tabs) return
+    setTemplate({
+      ...template,
+      howItWorks: {
+        tabs: template.howItWorks.tabs.map((tab, i) =>
+          i === index ? { ...tab, ...updates } : tab
+        )
+      }
+    })
+  }
+
   return (
     <div className="container mx-auto py-8">
       <div className="flex justify-between items-center mb-8">
@@ -868,11 +973,18 @@ export default function NewTemplatePage() {
             Previous
           </Button>
           {currentStep === STEPS.length - 1 ? (
-          <Button type="submit" disabled={submitting}>
-            {submitting ? "Creating..." : "Create Template"}
-          </Button>
+            <Button 
+              type="button" 
+              disabled={submitting}
+              onClick={handleSubmit}
+            >
+              {submitting ? "Creating..." : "Create Template"}
+            </Button>
           ) : (
-            <Button type="button" onClick={nextStep}>
+            <Button 
+              type="button" 
+              onClick={nextStep}
+            >
               Next
               <ChevronRight className="ml-2 h-4 w-4" />
             </Button>

@@ -17,7 +17,8 @@ import {
   X,
   Search,
 } from "lucide-react"
-
+import { useAuth } from "@/lib/firebase/auth"
+import { Navigation } from "@/components/Navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -47,6 +48,7 @@ interface Product {
 }
 
 export default function CurlyHairJournalSetupPage() {
+  const { logout } = useAuth()
   const [activeTab, setActiveTab] = useState("products")
   const [products, setProducts] = useState<Product[]>([])
   const [showAddProduct, setShowAddProduct] = useState(false)
@@ -95,7 +97,14 @@ export default function CurlyHairJournalSetupPage() {
   // At the beginning of the component, add this check
   const isBrowser = typeof window !== "undefined"
 
-  // Ensure any fetch requests or browser APIs are properly guarded
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
+  }
+
   const handleAddProduct = () => {
     if (newProduct.name && newProduct.brand && newProduct.type) {
       // Safely use browser APIs
@@ -122,7 +131,7 @@ export default function CurlyHairJournalSetupPage() {
     }
   }
 
-  const handleRemoveIngredient = (ingredient) => {
+  const handleRemoveIngredient = (ingredient: string) => {
     setNewProduct({
       ...newProduct,
       keyIngredients: newProduct.keyIngredients.filter((item) => item !== ingredient),
@@ -136,23 +145,7 @@ export default function CurlyHairJournalSetupPage() {
           <Edit3 className="h-5 w-5" />
           <span>JournalMind</span>
         </Link>
-        <nav className="ml-auto flex gap-2">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal">Dashboard</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal">Journal</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/journal">Affirmations</Link>
-          </Button>
-          <Button variant="ghost" size="sm" className="bg-primary/10" asChild>
-            <Link href="/marketplace">Marketplace</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin/templates">Admin</Link>
-          </Button>
-        </nav>
+        <Navigation onLogout={handleLogout} />
       </header>
       <main className="flex-1 p-6 md:p-8 lg:p-10">
         <div className="mx-auto max-w-4xl space-y-8">
