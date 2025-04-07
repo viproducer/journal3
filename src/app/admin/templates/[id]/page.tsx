@@ -199,140 +199,55 @@ export default function PreviewTemplatePage({ params }: PreviewTemplatePageProps
               </div>
             </Card>
 
-            {/* How It Works Section */}
-            <Card className="p-6">
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold">How It Works</h2>
-                  <p className="text-muted-foreground">Get started with your {template.name.toLowerCase()} in minutes</p>
-                </div>
-
-                <Tabs defaultValue="setup" className="w-full">
-                  <TabsList className="w-full grid grid-cols-3">
-                    <TabsTrigger value="setup">Setup</TabsTrigger>
-                    <TabsTrigger value="tracking">Tracking</TabsTrigger>
-                    <TabsTrigger value="reports">Reports</TabsTrigger>
+            {/* Journal Types Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Create {template.name} Entry</CardTitle>
+                <CardDescription>
+                  Fill out the form below to create a new entry for your {template.name.toLowerCase()}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue={template.journalTypes[0].id} className="w-full">
+                  <TabsList className="w-full flex flex-wrap gap-2 p-1 bg-muted rounded-lg">
+                    {template.journalTypes.map((journalType) => (
+                      <TabsTrigger 
+                        key={journalType.id} 
+                        value={journalType.id}
+                        className="flex-1 min-w-[120px] data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+                      >
+                        {journalType.name}
+                      </TabsTrigger>
+                    ))}
                   </TabsList>
 
-                  {/* Setup Tab */}
-                  <TabsContent value="setup" className="mt-6 space-y-6">
-                    <div className="flex gap-4">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-medium">
-                        1
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-lg">Add Household Members</h3>
-                        <p className="text-muted-foreground">Add all the people in your household who will be sharing responsibilities.</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-4">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-medium">
-                        2
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-lg">Create Task Categories</h3>
-                        <p className="text-muted-foreground">Set up categories like cleaning, cooking, shopping, and maintenance.</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-4">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-medium">
-                        3
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-lg">Schedule Regular Tasks</h3>
-                        <p className="text-muted-foreground">Create recurring tasks and assign them to household members.</p>
-                      </div>
-                    </div>
-                  </TabsContent>
+                  {template.journalTypes.map((journalType) => (
+                    <div key={journalType.id} className="mt-6">
+                      <TabsContent value={journalType.id} className="focus-visible:outline-none">
+                        <div className="space-y-6">
+                          <div className="border-b pb-4">
+                            <h3 className="text-lg font-medium">{journalType.name}</h3>
+                            <p className="text-sm text-muted-foreground">{journalType.description}</p>
+                          </div>
 
-                  {/* Tracking Tab */}
-                  <TabsContent value="tracking" className="mt-6 space-y-6">
-                    <div className="flex gap-4">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-medium">
-                        1
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-lg">Mark Tasks Complete</h3>
-                        <p className="text-muted-foreground">Check off tasks as they're completed throughout the day.</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-4">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-medium">
-                        2
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-lg">Add Notes</h3>
-                        <p className="text-muted-foreground">Include any special instructions or feedback about the tasks.</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-4">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-medium">
-                        3
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-lg">Track Progress</h3>
-                        <p className="text-muted-foreground">Monitor task completion and household participation.</p>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  {/* Reports Tab */}
-                  <TabsContent value="reports" className="mt-6 space-y-6">
-                    <div className="flex gap-4">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-medium">
-                        1
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-lg">View Weekly Summary</h3>
-                        <p className="text-muted-foreground">See task completion rates and participation by household member.</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-4">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-medium">
-                        2
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-lg">Analyze Patterns</h3>
-                        <p className="text-muted-foreground">Identify peak activity times and task distribution patterns.</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-4">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-medium">
-                        3
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-lg">Adjust Schedule</h3>
-                        <p className="text-muted-foreground">Optimize your household routine based on the insights.</p>
-                      </div>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </div>
-            </Card>
-
-            {/* Journal Types Section */}
-            {template.journalTypes.map((journalType, index) => (
-              <Card key={index} className="p-6">
-                <div className="flex items-start gap-4 mb-6">
-                  <div className="text-4xl">{journalType.icon}</div>
-                  <div>
-                    <h3 className="text-xl font-semibold">{journalType.name}</h3>
-                    <p className="text-muted-foreground mt-2">{journalType.description}</p>
-                  </div>
-                </div>
-                <div className="space-y-6">
-                  {journalType.fields.map((field) => (
-                    <div key={field.id} className="space-y-2">
-                      <Label>{field.label}</Label>
-                      {field.description && (
-                        <p className="text-sm text-muted-foreground">{field.description}</p>
-                      )}
-                      <PreviewField field={field} />
+                          <div className="space-y-4">
+                            {journalType.fields.map((field) => (
+                              <div key={field.id} className="space-y-2">
+                                <Label>{field.label}</Label>
+                                {field.description && (
+                                  <p className="text-sm text-muted-foreground">{field.description}</p>
+                                )}
+                                <PreviewField field={field} />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </TabsContent>
                     </div>
                   ))}
-                </div>
-              </Card>
-            ))}
+                </Tabs>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </main>

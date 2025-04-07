@@ -23,10 +23,15 @@ import { useAuth } from "@/lib/firebase/auth"
 import { createEntry, getUserJournals, createJournal } from "@/lib/firebase/db"
 import { getPublicTemplates } from "@/lib/firebase/templates"
 import { JournalEntry, Journal, MarketplaceTemplate } from "@/lib/firebase/types"
+import { getUserProfile, isUserSubscribedToTemplate } from "@/lib/firebase/users"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
 
 import MoodFeelingsForm from "@/components/journal/mood-feelings-form"
 import TrackingLogsForm from "@/components/journal/tracking-logs-form"
@@ -36,6 +41,7 @@ import JournalingPromptsForm from "@/components/journal/journaling-prompts-form"
 import DailyCheckinsForm from "@/components/journal/daily-checkins-form"
 import ChallengesStreaksForm from "@/components/journal/challenges-streaks-form"
 import { Navigation } from "@/components/Navigation"
+import MarketplaceTemplateForm from "@/components/journal/marketplace-template-form"
 
 export default function CreateEntryPage() {
   const router = useRouter()
@@ -44,6 +50,8 @@ export default function CreateEntryPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [marketplaceTemplates, setMarketplaceTemplates] = useState<MarketplaceTemplate[]>([])
+  const [subscribedTemplates, setSubscribedTemplates] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
 
   // Check if there's a template query parameter
   const [searchParams, setSearchParams] = useState(() => {
@@ -54,20 +62,36 @@ export default function CreateEntryPage() {
   })
   const templateParam = searchParams.get("template")
 
-  // Load marketplace templates
+  // Load marketplace templates and user's subscribed templates
   useEffect(() => {
     const loadTemplates = async () => {
+      if (!user) return
+      
       try {
+        setLoading(true)
         const templates = await getPublicTemplates()
-        setMarketplaceTemplates(templates)
+        
+        // Get user's subscribed templates
+        const userProfile = await getUserProfile(user.uid)
+        const subscribedIds = userProfile?.subscribedTemplates || []
+        setSubscribedTemplates(subscribedIds)
+        
+        // Only show templates the user has subscribed to
+        const filteredTemplates = templates.filter(template => 
+          subscribedIds.includes(template.id)
+        )
+        
+        setMarketplaceTemplates(filteredTemplates)
       } catch (err) {
         console.error('Error loading marketplace templates:', err)
         setError('Failed to load marketplace templates')
+      } finally {
+        setLoading(false)
       }
     }
 
     loadTemplates()
-  }, [])
+  }, [user])
 
   // If a template is specified in the URL, show it first
   useEffect(() => {
@@ -203,58 +227,6 @@ export default function CreateEntryPage() {
     },
   ]
 
-  const allCategories = [
-    ...categories,
-    ...marketplaceTemplates.map((template) => ({
-      id: `marketplace-${template.id}`,
-      name: template.name,
-      icon: template.icon,
-      description: template.description,
-      component: (
-        <Card className="border-2 border-dashed">
-          <CardContent className="p-6">
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold">How It Works</h2>
-                <p className="text-muted-foreground">Get started with your {template.name.toLowerCase()} in minutes</p>
-              </div>
-
-              <Tabs defaultValue="setup" className="w-full">
-                <TabsList className="w-full grid grid-cols-3">
-                  <TabsTrigger value="setup">Setup</TabsTrigger>
-                  <TabsTrigger value="tracking">Tracking</TabsTrigger>
-                  <TabsTrigger value="reports">Reports</TabsTrigger>
-                </TabsList>
-
-                <div className="mt-6 space-y-6">
-                  {template.howItWorks.tabs.map((tab, index) => (
-                    <div key={tab.title} className="flex gap-4">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-medium">
-                        {index + 1}
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-lg">{tab.title}</h3>
-                        <p className="text-muted-foreground">{tab.content}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Tabs>
-            </div>
-
-            <div className="mt-6 flex justify-end">
-              <Button asChild>
-                <Link href={`/admin/templates/${template.id}`}>Open Template</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ),
-    })),
-  ]
-
-  const selectedCategoryData = allCategories.find((category) => category.id === selectedCategory)
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!user) return
@@ -264,7 +236,15 @@ export default function CreateEntryPage() {
       const content = formData.get('content') as string
       const category = formData.get('category') as string
       const type = formData.get('type') as string
-      const metadata = JSON.parse(formData.get('metadata') as string || '{}')
+      
+      // Collect metadata from form fields
+      const metadata: Record<string, any> = {}
+      formData.forEach((value, key) => {
+        if (key.startsWith('metadata.')) {
+          const fieldKey = key.replace('metadata.', '')
+          metadata[fieldKey] = value
+        }
+      })
 
       // Get or create default journal
       const journals = await getUserJournals(user.uid)
@@ -305,9 +285,9 @@ export default function CreateEntryPage() {
       console.log('Creating entry with data:', data)
       await createEntry(data)
       router.push('/journal/browse')
-    } catch (error) {
-      console.error('Error creating entry:', error)
-      alert('Failed to create entry. Please try again.')
+    } catch (err) {
+      console.error('Error creating entry:', err)
+      setError('Failed to create entry')
     }
   }
 
@@ -318,6 +298,90 @@ export default function CreateEntryPage() {
       console.error('Error signing out:', error)
     }
   }
+
+  const allCategories = [
+    ...categories,
+    ...marketplaceTemplates.map((template) => {
+      console.log('Creating marketplace template component for:', template.name);
+      console.log('Template data:', template);
+      return {
+        id: `marketplace-${template.id}`,
+        name: template.name,
+        icon: template.icon,
+        description: template.description,
+        component: (
+          <MarketplaceTemplateForm 
+            template={template} 
+            onSubmit={async (formData) => {
+              try {
+                if (!user) return;
+
+                // Get or create default journal
+                const journals = await getUserJournals(user.uid);
+                let journal = journals[0]; // Use the first journal or create a new one
+                
+                if (!journal) {
+                  journal = await createJournal({
+                    userId: user.uid,
+                    name: "My Journal",
+                    description: "My personal journal",
+                    isActive: true,
+                    isArchived: false,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    settings: {
+                      isPrivate: true,
+                      allowComments: false,
+                      allowSharing: false
+                    }
+                  });
+                }
+
+                if (!journal?.id) {
+                  throw new Error('Failed to get or create journal');
+                }
+
+                const content = formData.get('content') as string;
+                const category = formData.get('category') as string;
+                const type = formData.get('type') as string;
+                
+                // Collect metadata from form fields
+                const metadata: Record<string, any> = {};
+                formData.forEach((value, key) => {
+                  if (key.startsWith('metadata.')) {
+                    const fieldKey = key.replace('metadata.', '');
+                    metadata[fieldKey] = value;
+                  }
+                });
+
+                const data = {
+                  content,
+                  category,
+                  type,
+                  userId: user.uid,
+                  journalId: journal.id,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                  metadata
+                };
+
+                console.log('Creating entry with data:', data);
+                await createEntry(data);
+                router.push('/journal/browse');
+              } catch (error) {
+                console.error('Error submitting marketplace template form:', error);
+                setError('Failed to create entry. Please try again.');
+              }
+            }}
+          />
+        ),
+      };
+    }),
+  ]
+
+  const selectedCategoryData = allCategories.find((category) => category.id === selectedCategory)
+  console.log('Selected category:', selectedCategory);
+  console.log('Selected category data:', selectedCategoryData);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -343,57 +407,66 @@ export default function CreateEntryPage() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit}>
-            <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full">
-              <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-6">
-                {categories.slice(0, 8).map((category) => (
-                  <TabsTrigger key={category.id} value={category.id} className="flex items-center gap-2">
-                    {category.icon}
-                    <span className="truncate">{category.name}</span>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+          <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full">
+            <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-6">
+              {categories.slice(0, 8).map((category) => (
+                <TabsTrigger key={category.id} value={category.id} className="flex items-center gap-2">
+                  {category.icon}
+                  <span className="truncate">{category.name}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-              {marketplaceTemplates.length > 0 && (
-                <>
-                  <div className="flex items-center gap-2 mt-6 mb-3">
-                    <ShoppingBag className="h-5 w-5 text-primary" />
-                    <h2 className="text-lg font-medium">Your Marketplace Journals</h2>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    {marketplaceTemplates.map((template) => (
-                      <Card
-                        key={template.id}
-                        className={`cursor-pointer hover:border-primary transition-colors ${selectedCategory === `marketplace-${template.id}` ? "border-primary" : ""}`}
-                        onClick={() => setSelectedCategory(`marketplace-${template.id}`)}
-                      >
-                        <CardContent className="p-4 flex items-center gap-3">
-                          <div className={`${template.color} text-white p-2 rounded-full`}>
-                            {template.icon}
-                          </div>
-                          <div>
-                            <h3 className="font-medium">{template.name}</h3>
-                            <p className="text-sm text-muted-foreground">{template.description}</p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </>
-              )}
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+              </div>
+            ) : marketplaceTemplates.length > 0 ? (
+              <>
+                <div className="flex items-center gap-2 mt-6 mb-3">
+                  <ShoppingBag className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-medium">Your Marketplace Journals</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  {marketplaceTemplates.map((template) => (
+                    <Card
+                      key={template.id}
+                      className={`cursor-pointer hover:border-primary transition-colors ${selectedCategory === `marketplace-${template.id}` ? "border-primary" : ""}`}
+                      onClick={() => setSelectedCategory(`marketplace-${template.id}`)}
+                    >
+                      <CardContent className="p-4 flex items-center gap-3">
+                        <div className={`${template.color} text-white p-2 rounded-full`}>
+                          {template.icon}
+                        </div>
+                        <div>
+                          <h3 className="font-medium">{template.name}</h3>
+                          <p className="text-sm text-muted-foreground">{template.description}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-8 border rounded-md">
+                <h3 className="text-lg font-medium mb-2">No Marketplace Journals</h3>
+                <p className="text-muted-foreground mb-4">
+                  You haven't registered for any marketplace journals yet.
+                </p>
+                <Button asChild>
+                  <Link href="/marketplace">
+                    Browse Marketplace
+                  </Link>
+                </Button>
+              </div>
+            )}
 
-              <Card>
-                <CardContent className="p-6">
-                  {selectedCategoryData?.component}
-                  <div className="mt-6 flex justify-end">
-                    <Button type="submit" className="w-full sm:w-auto">
-                      Create Entry
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </Tabs>
-          </form>
+            <Card>
+              <CardContent className="p-6">
+                {selectedCategoryData?.component}
+              </CardContent>
+            </Card>
+          </Tabs>
         </div>
       </main>
     </div>
