@@ -70,22 +70,26 @@ export default function NewJournalForm() {
       let journals = await getUserJournals(user.uid)
       console.log("Found journals:", journals)
       
-      let journalId: string
+      let journalId: string | undefined
 
       if (journals.length === 0) {
         console.log("No journals found, creating default journal...")
         // Create a default journal if none exists
         const defaultJournal: Omit<Journal, 'id'> = {
           name: "My Journal",
-          icon: "📝",
           description: "My personal journal",
           color: "#4CAF50",
-          category: "Personal",
           userId: user.uid,
+          isActive: true,
+          isArchived: false,
           createdAt: new Date(),
           updatedAt: new Date(),
-          entries: 0,
-          lastEntry: new Date()
+          entries: [],
+          settings: {
+            isPrivate: true,
+            allowComments: false,
+            allowSharing: false
+          }
         }
         console.log("Creating default journal with data:", defaultJournal)
         const newJournal = await createJournal(defaultJournal)
@@ -96,12 +100,16 @@ export default function NewJournalForm() {
         console.log("Using existing journal:", journalId)
       }
 
+      if (!journalId) {
+        throw new Error("Failed to get or create a journal")
+      }
+
       const entryData: Omit<JournalEntry, "id"> = {
         journalId,
         userId: user.uid,
-        title: title.trim(),
         content: content.trim(),
         category,
+        type: category,
         tags,
         metadata: {},
         createdAt: new Date(),
@@ -183,14 +191,14 @@ export default function NewJournalForm() {
           className="w-full p-2 border rounded-md"
           disabled={isSubmitting}
         >
-          <option value="Mood & Feelings">Mood & Feelings</option>
-          <option value="Tracking & Logs">Tracking & Logs</option>
-          <option value="Gratitude & Reflection">Gratitude & Reflection</option>
-          <option value="Goals & Intentions">Goals & Intentions</option>
-          <option value="Future Visioning">Future Visioning</option>
-          <option value="Journaling Prompts">Journaling Prompts</option>
-          <option value="Daily Check-ins">Daily Check-ins</option>
-          <option value="Challenges & Streaks">Challenges & Streaks</option>
+          <option value="mood-feelings">Mood & Feelings</option>
+          <option value="tracking-logs">Tracking & Logs</option>
+          <option value="gratitude-reflection">Gratitude & Reflection</option>
+          <option value="goals-intentions">Goals & Intentions</option>
+          <option value="future-visioning">Future Visioning</option>
+          <option value="journaling-prompts">Journaling Prompts</option>
+          <option value="daily-checkins">Daily Check-ins</option>
+          <option value="challenges-streaks">Challenges & Streaks</option>
         </select>
       </div>
 

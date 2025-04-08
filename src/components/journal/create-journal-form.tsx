@@ -39,14 +39,18 @@ export default function CreateJournalForm() {
       const journalData: Omit<Journal, "id"> = {
         name,
         description,
-        category,
         color,
         userId: user.uid,
-        icon: "📝", // TODO: Add icon selection
+        isActive: true,
+        isArchived: false,
         createdAt: new Date(),
         updatedAt: new Date(),
-        entries: 0,
-        lastEntry: new Date()
+        entries: [],
+        settings: {
+          isPrivate: true,
+          allowComments: false,
+          allowSharing: false
+        }
       }
 
       await createJournal(journalData)
@@ -100,14 +104,14 @@ export default function CreateJournalForm() {
           onChange={(e) => setCategory(e.target.value)}
           className="w-full p-2 border rounded-md"
         >
-          <option value="Mood & Feelings">Mood & Feelings</option>
-          <option value="Tracking & Logs">Tracking & Logs</option>
-          <option value="Gratitude & Reflection">Gratitude & Reflection</option>
-          <option value="Goals & Intentions">Goals & Intentions</option>
-          <option value="Future Visioning">Future Visioning</option>
-          <option value="Journaling Prompts">Journaling Prompts</option>
-          <option value="Daily Check-ins">Daily Check-ins</option>
-          <option value="Challenges & Streaks">Challenges & Streaks</option>
+          <option value="mood-feelings">Mood & Feelings</option>
+          <option value="tracking-logs">Tracking & Logs</option>
+          <option value="gratitude-reflection">Gratitude & Reflection</option>
+          <option value="goals-intentions">Goals & Intentions</option>
+          <option value="future-visioning">Future Visioning</option>
+          <option value="journaling-prompts">Journaling Prompts</option>
+          <option value="daily-checkins">Daily Check-ins</option>
+          <option value="challenges-streaks">Challenges & Streaks</option>
         </select>
       </div>
 

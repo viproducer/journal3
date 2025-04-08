@@ -245,7 +245,7 @@ export default function BrowseJournalPage() {
     // Apply category filter
     if (selectedCategories.length > 0) {
       filtered = filtered.filter(entry =>
-        selectedCategories.includes(entry.metadata?.type || '')
+        selectedCategories.includes(entry.type || '')
       )
     }
 
@@ -456,9 +456,9 @@ export default function BrowseJournalPage() {
         {/* Journal Entries Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredEntries.map((entry, index) => {
-            const categoryStyles = getCategoryStyles(entry.metadata?.type || 'mood-feelings')
+            const categoryStyles = getCategoryStyles(entry.type || 'mood-feelings')
             const isExpanded = expandedEntryId === entry.id
-            const fields = EXPANDED_FIELDS[entry.metadata?.type as keyof typeof EXPANDED_FIELDS] || []
+            const fields = EXPANDED_FIELDS[entry.type as keyof typeof EXPANDED_FIELDS] || []
             
             return (
               <div 
@@ -491,7 +491,7 @@ export default function BrowseJournalPage() {
                       categoryStyles.color
                     )}>
                       {React.createElement(categoryStyles.icon, { className: "h-3.5 w-3.5" })}
-                      {formatCategoryName(entry.metadata?.type || 'mood-feelings')}
+                      {formatCategoryName(entry.type || 'mood-feelings')}
                     </div>
                     <div className="flex items-center gap-1">
                       <Button

@@ -98,7 +98,8 @@ export function getCategoryStyles(categoryId: string) {
 }
 
 export function formatCategoryName(categoryId: string) {
-  return categoryId.split('-').map(word => 
+  const category = CATEGORIES.find(c => c.id === categoryId)
+  return category ? category.name : categoryId.split('-').map(word => 
     word.charAt(0).toUpperCase() + word.slice(1)
   ).join(' ')
 } 

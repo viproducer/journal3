@@ -527,7 +527,7 @@ export default function EditTemplatePage({ params }: EditTemplatePageProps) {
                             <SelectItem value="finance">Finance</SelectItem>
                             <SelectItem value="education">Education</SelectItem>
                             <SelectItem value="mood">Mood & Feelings</SelectItem>
-                            <SelectItem value="tracking">Tracking & Logs</SelectItem>
+                            <SelectItem value="tracking-logs">Tracking & Logs</SelectItem>
                             <SelectItem value="gratitude">Gratitude & Reflection</SelectItem>
                             <SelectItem value="goals">Goals & Intentions</SelectItem>
                             <SelectItem value="future">Future Visioning</SelectItem>

@@ -225,21 +225,33 @@ export async function createEntry(entryData: Omit<JournalEntry, 'id'>) {
     // For goals, ensure consistent category and type
     const isGoal = entryData.metadata?.goalStatement || entryData.metadata?.goalWhy;
     
-    // Set category and type at root level
-    const category = isGoal ? 'goals-intentions' : (entryData.category || entryData.metadata?.category || 'general');
-    const type = isGoal ? 'goals-intentions' : (entryData.type || entryData.metadata?.type || 'entry');
+    // Create metadata object without category and type
+    const { category: metadataCategory, type: metadataType, ...cleanMetadata } = entryData.metadata || {};
     
-    // Create entry without duplicating category and type in metadata
+    // Compute category and type
+    const category = isGoal ? 'goals-intentions' : (entryData.category || metadataCategory || 'general');
+    const type = isGoal ? 'goals-intentions' : (entryData.type || metadataType || entryData.category || 'general');
+    
+    // Create entry with clean metadata and explicit category/type
     const entryToSave = {
-      ...entryData,
+      userId: entryData.userId,
+      journalId: entryData.journalId,
+      content: entryData.content,
       category,
       type,
-      metadata: {
-        ...entryData.metadata
-      },
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now()
-    };
+      metadata: cleanMetadata,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    } as Omit<JournalEntry, 'id'>;
+
+    // Add optional fields if they exist
+    if (entryData.mood) entryToSave.mood = entryData.mood;
+    if (entryData.tags) entryToSave.tags = entryData.tags;
+    if (entryData.attachments) entryToSave.attachments = entryData.attachments;
+    if (entryData.startTime) entryToSave.startTime = entryData.startTime;
+    if (entryData.endTime) entryToSave.endTime = entryData.endTime;
+    if (entryData.timeSpent) entryToSave.timeSpent = entryData.timeSpent;
+    if (entryData.relatedGoals) entryToSave.relatedGoals = entryData.relatedGoals;
 
     console.log('Saving entry with data:', entryToSave);
     const docRef = await addDoc(entriesRef, entryToSave);

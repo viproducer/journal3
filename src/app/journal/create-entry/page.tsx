@@ -52,6 +52,7 @@ export default function CreateEntryPage() {
   const [marketplaceTemplates, setMarketplaceTemplates] = useState<MarketplaceTemplate[]>([])
   const [subscribedTemplates, setSubscribedTemplates] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [userProfile, setUserProfile] = useState<any>(null)
 
   // Check if there's a template query parameter
   const [searchParams, setSearchParams] = useState(() => {
@@ -82,6 +83,7 @@ export default function CreateEntryPage() {
         )
         
         setMarketplaceTemplates(filteredTemplates)
+        setUserProfile(userProfile)
       } catch (err) {
         console.error('Error loading marketplace templates:', err)
         setError('Failed to load marketplace templates')
@@ -104,151 +106,13 @@ export default function CreateEntryPage() {
     }
   }, [templateParam, marketplaceTemplates])
 
-  const handleGoalSubmit = async (data: { 
-    title: string
-    content: string
-    trackingType: "habit" | "fitness" | "nutrition" | "sleep" | "mood" | "finance" | "productivity" | "custom"
-    isGoalTracking: boolean
-    linkedGoalId: string
-    metrics: Array<{
-      name: string
-      value: string
-      unit: string
-      unitType: string
-      unitSystem: "metric" | "imperial"
-      secondaryValue?: string
-      secondaryUnit?: string
-      notes?: string
-    }>
-    targetProgress: Array<{
-      targetId: string
-      value: string
-      secondaryValue: string
-      notes: string
-    }>
-  }) => {
-    return new Promise<void>((resolve, reject) => {
-      try {
-        const form = document.querySelector('form')
-        if (!form) {
-          reject(new Error('Form not found'))
-          return
-        }
-
-        // Add hidden inputs with the tracking data
-        const contentInput = document.createElement('input')
-        contentInput.type = 'hidden'
-        contentInput.name = 'content'
-        contentInput.value = data.content
-        form.appendChild(contentInput)
-
-        const categoryInput = document.createElement('input')
-        categoryInput.type = 'hidden'
-        categoryInput.name = 'category'
-        categoryInput.value = 'tracking-logs'
-        form.appendChild(categoryInput)
-
-        const typeInput = document.createElement('input')
-        typeInput.type = 'hidden'
-        typeInput.name = 'type'
-        typeInput.value = data.trackingType
-        form.appendChild(typeInput)
-
-        const metadataInput = document.createElement('input')
-        metadataInput.type = 'hidden'
-        metadataInput.name = 'metadata'
-        metadataInput.value = JSON.stringify({
-          title: data.title,
-          isGoalTracking: data.isGoalTracking,
-          linkedGoalId: data.linkedGoalId,
-          metrics: data.metrics,
-          targetProgress: data.targetProgress
-        })
-        form.appendChild(metadataInput)
-
-        // Submit the form
-        form.requestSubmit()
-        resolve()
-      } catch (error) {
-        reject(error)
-      }
-    })
-  }
-
-  const categories = [
-    {
-      id: "mood-feelings",
-      name: "Mood & Feelings",
-      icon: <Heart className="h-5 w-5" />,
-      description: "Track emotions, moods, and feelings with reflection prompts.",
-      component: <MoodFeelingsForm />,
-    },
-    {
-      id: "tracking-logs",
-      name: "Tracking & Logs",
-      icon: <BarChart2 className="h-5 w-5" />,
-      description: "Log and track habits, activities, and metrics with customizable fields.",
-      component: <TrackingLogsForm onSubmit={handleGoalSubmit} />,
-    },
-    {
-      id: "gratitude-reflection",
-      name: "Gratitude & Reflection",
-      icon: <Star className="h-5 w-5" />,
-      description: "Practice gratitude and reflect on experiences with guided prompts.",
-      component: <GratitudeReflectionForm />,
-    },
-    {
-      id: "future-visioning",
-      name: "Future Visioning",
-      icon: <Compass className="h-5 w-5" />,
-      description: "Envision and plan for your future across different life areas and timeframes.",
-      component: <FutureVisioningForm />,
-    },
-    {
-      id: "journaling-prompts",
-      name: "Journaling Prompts",
-      icon: <HelpCircle className="h-5 w-5" />,
-      description: "Respond to thought-provoking prompts across different categories.",
-      component: <JournalingPromptsForm />,
-    },
-    {
-      id: "daily-checkins",
-      name: "Daily Check-ins",
-      icon: <Sun className="h-5 w-5" />,
-      description: "Quick daily check-ins for morning and evening with mood and energy tracking.",
-      component: <DailyCheckinsForm />,
-    },
-    {
-      id: "challenges-streaks",
-      name: "Challenges & Streaks",
-      icon: <Zap className="h-5 w-5" />,
-      description: "Track progress on challenges and streaks with day counting and reflection.",
-      component: <ChallengesStreaksForm />,
-    },
-  ]
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    if (!user) return
-
+  const handleSubmit = async (formData: FormData) => {
     try {
-      const formData = new FormData(e.currentTarget)
-      const content = formData.get('content') as string
-      const category = formData.get('category') as string
-      const type = formData.get('type') as string
-      
-      // Collect metadata from form fields
-      const metadata: Record<string, any> = {}
-      formData.forEach((value, key) => {
-        if (key.startsWith('metadata.')) {
-          const fieldKey = key.replace('metadata.', '')
-          metadata[fieldKey] = value
-        }
-      })
+      if (!user) return;
 
       // Get or create default journal
-      const journals = await getUserJournals(user.uid)
-      let journal = journals[0] // Use the first journal or create a new one
+      const journals = await getUserJournals(user.uid);
+      let journal = journals[0]; // Use the first journal or create a new one
       
       if (!journal) {
         journal = await createJournal({
@@ -264,12 +128,17 @@ export default function CreateEntryPage() {
             allowComments: false,
             allowSharing: false
           }
-        })
+        });
       }
 
       if (!journal?.id) {
-        throw new Error('Failed to get or create journal')
+        throw new Error('Failed to get or create journal');
       }
+
+      const content = formData.get('content') as string;
+      const category = formData.get('category') as string;
+      const type = formData.get('type') as string;
+      const metadata = JSON.parse(formData.get('metadata') as string);
 
       const data = {
         content,
@@ -280,16 +149,68 @@ export default function CreateEntryPage() {
         createdAt: new Date(),
         updatedAt: new Date(),
         metadata
-      }
+      };
 
-      console.log('Creating entry with data:', data)
-      await createEntry(data)
-      router.push('/journal/browse')
-    } catch (err) {
-      console.error('Error creating entry:', err)
-      setError('Failed to create entry')
+      console.log('Creating entry with data:', data);
+      await createEntry(data);
+      router.push('/journal/browse');
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      setError('Failed to create entry');
     }
-  }
+  };
+
+  const categories = [
+    {
+      id: "mood-feelings",
+      name: "Mood & Feelings",
+      icon: <Heart className="h-5 w-5" />,
+      description: "Track emotions, moods, and feelings with reflection prompts.",
+      component: <MoodFeelingsForm onSubmit={handleSubmit} />,
+    },
+    {
+      id: "tracking-logs",
+      name: "Tracking & Logs",
+      icon: <BarChart2 className="h-5 w-5" />,
+      description: "Log and track habits, activities, and metrics with customizable fields.",
+      component: <TrackingLogsForm onSubmit={handleSubmit} />,
+    },
+    {
+      id: "gratitude-reflection",
+      name: "Gratitude & Reflection",
+      icon: <Star className="h-5 w-5" />,
+      description: "Practice gratitude and reflect on experiences with guided prompts.",
+      component: <GratitudeReflectionForm onSubmit={handleSubmit} />,
+    },
+    {
+      id: "future-visioning",
+      name: "Future Visioning",
+      icon: <Compass className="h-5 w-5" />,
+      description: "Envision and plan for your future across different life areas and timeframes.",
+      component: <FutureVisioningForm onSubmit={handleSubmit} />,
+    },
+    {
+      id: "journaling-prompts",
+      name: "Journaling Prompts",
+      icon: <HelpCircle className="h-5 w-5" />,
+      description: "Respond to thought-provoking prompts across different categories.",
+      component: <JournalingPromptsForm onSubmit={handleSubmit} />,
+    },
+    {
+      id: "daily-checkins",
+      name: "Daily Check-ins",
+      icon: <Sun className="h-5 w-5" />,
+      description: "Quick daily check-ins for morning and evening with mood and energy tracking.",
+      component: <DailyCheckinsForm onSubmit={handleSubmit} />,
+    },
+    {
+      id: "challenges-streaks",
+      name: "Challenges & Streaks",
+      icon: <Zap className="h-5 w-5" />,
+      description: "Track progress on challenges and streaks with day counting and reflection.",
+      component: <ChallengesStreaksForm onSubmit={handleSubmit} />,
+    },
+  ]
 
   const handleLogout = async () => {
     try {
@@ -312,67 +233,7 @@ export default function CreateEntryPage() {
         component: (
           <MarketplaceTemplateForm 
             template={template} 
-            onSubmit={async (formData) => {
-              try {
-                if (!user) return;
-
-                // Get or create default journal
-                const journals = await getUserJournals(user.uid);
-                let journal = journals[0]; // Use the first journal or create a new one
-                
-                if (!journal) {
-                  journal = await createJournal({
-                    userId: user.uid,
-                    name: "My Journal",
-                    description: "My personal journal",
-                    isActive: true,
-                    isArchived: false,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                    settings: {
-                      isPrivate: true,
-                      allowComments: false,
-                      allowSharing: false
-                    }
-                  });
-                }
-
-                if (!journal?.id) {
-                  throw new Error('Failed to get or create journal');
-                }
-
-                const content = formData.get('content') as string;
-                const category = formData.get('category') as string;
-                const type = formData.get('type') as string;
-                
-                // Collect metadata from form fields
-                const metadata: Record<string, any> = {};
-                formData.forEach((value, key) => {
-                  if (key.startsWith('metadata.')) {
-                    const fieldKey = key.replace('metadata.', '');
-                    metadata[fieldKey] = value;
-                  }
-                });
-
-                const data = {
-                  content,
-                  category,
-                  type,
-                  userId: user.uid,
-                  journalId: journal.id,
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
-                  metadata
-                };
-
-                console.log('Creating entry with data:', data);
-                await createEntry(data);
-                router.push('/journal/browse');
-              } catch (error) {
-                console.error('Error submitting marketplace template form:', error);
-                setError('Failed to create entry. Please try again.');
-              }
-            }}
+            onSubmit={handleSubmit}
           />
         ),
       };
