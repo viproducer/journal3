@@ -10,15 +10,6 @@ import Link from "next/link"
 import {
   ArrowLeft,
   Eye,
-  Layers,
-  FileText,
-  List,
-  CheckSquare,
-  ToggleLeft,
-  Calendar,
-  Image,
-  FileInput,
-  LayoutGrid,
 } from "lucide-react"
 import {
   Card,
@@ -34,8 +25,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import { Navigation } from "@/components/Navigation"
+
+interface PreviewField {
+  type: string;
+  placeholder?: string;
+  options?: string[];
+}
 
 interface PreviewTemplatePageProps {
   params: Promise<{ id: string }>
@@ -83,7 +79,7 @@ export default function PreviewTemplatePage({ params }: PreviewTemplatePageProps
     return null
   }
 
-  const PreviewField = ({ field }: { field: any }) => {
+  const PreviewField = ({ field }: { field: PreviewField }) => {
     switch (field.type) {
       case "text":
         return (

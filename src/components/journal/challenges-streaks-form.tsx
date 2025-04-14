@@ -266,3 +266,5 @@ export function ChallengesStreaksForm({ onSubmit }: ChallengesStreaksFormProps) 
   )
 }
 
+export default ChallengesStreaksForm;
+

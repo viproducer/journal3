@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, use } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Edit3, Trash2, ArrowLeft } from "lucide-react"
@@ -23,9 +23,15 @@ const getMoodEmoji = (moodLevel: number) => {
   return "😢" // Very sad
 }
 
-export default function JournalEntryPage({ params }: { params: { id: string } }) {
+interface JournalEntryPageProps {
+  params: Promise<{
+    id: string
+  }>
+}
+
+export default function JournalEntryPage({ params }: JournalEntryPageProps) {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, loading: authLoading, hasRole, logout } = useAuth()
   const [entry, setEntry] = useState<JournalEntry | null>(null)
   const [editedContent, setEditedContent] = useState<string>("")
   const [isEditing, setIsEditing] = useState(false)
@@ -35,14 +41,15 @@ export default function JournalEntryPage({ params }: { params: { id: string } })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [localMetadata, setLocalMetadata] = useState<JournalEntry['metadata']>({})
+  const resolvedParams = use(params)
 
   // Handle new/create-entry redirects
   useEffect(() => {
-  if (params.id === "new" || params.id === "new-entry") {
+  if (resolvedParams.id === "new" || resolvedParams.id === "new-entry") {
       router.push("/journal/create-entry")
       return
     }
-  }, [params.id, router])
+  }, [resolvedParams.id, router])
 
   // Load entry data
   useEffect(() => {
@@ -54,7 +61,7 @@ export default function JournalEntryPage({ params }: { params: { id: string } })
         setError(null)
 
         const journalId = localStorage.getItem('currentJournalId') || 'default'
-        const entryData = await getJournalEntry(user.uid, journalId, params.id)
+        const entryData = await getJournalEntry(user.uid, journalId, resolvedParams.id)
         
         if (!entryData) {
           setError("Entry not found")
@@ -74,7 +81,7 @@ export default function JournalEntryPage({ params }: { params: { id: string } })
     }
 
     loadEntry()
-  }, [user, params.id])
+  }, [user, resolvedParams.id])
 
   // Load goals separately
   useEffect(() => {

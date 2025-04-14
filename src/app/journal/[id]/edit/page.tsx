@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, use } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/firebase/auth"
 import { getJournalEntry, updateJournalEntry } from "@/lib/firebase/db"
@@ -12,17 +12,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Edit3 } from "lucide-react"
 
 interface EditEntryPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export default function EditEntryPage({ params }: EditEntryPageProps) {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, loading: authLoading, hasRole, logout } = useAuth()
   const [entry, setEntry] = useState<JournalEntry | null>(null)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const resolvedParams = use(params)
   const [formData, setFormData] = useState({
     title: "",
     content: "",
@@ -37,11 +38,11 @@ export default function EditEntryPage({ params }: EditEntryPageProps) {
 
     const loadEntry = async () => {
       try {
-        setLoading(true)
+        setIsLoading(true)
         const journalId = localStorage.getItem('currentJournalId')
         if (!journalId) throw new Error('No journal ID found')
 
-        const entryData = await getJournalEntry(user.uid, journalId, params.id)
+        const entryData = await getJournalEntry(user.uid, journalId, resolvedParams.id)
         if (!entryData) throw new Error('Entry not found')
 
         setEntry(entryData)
@@ -54,19 +55,19 @@ export default function EditEntryPage({ params }: EditEntryPageProps) {
         console.error('Error loading entry:', err)
         setError(err instanceof Error ? err.message : 'Failed to load entry')
       } finally {
-        setLoading(false)
+        setIsLoading(false)
       }
     }
 
     loadEntry()
-  }, [user, params.id, router])
+  }, [user, resolvedParams.id, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user || !entry) return
 
     try {
-      setLoading(true)
+      setIsLoading(true)
       const journalId = localStorage.getItem('currentJournalId')
       if (!journalId) throw new Error('No journal ID found')
 
@@ -82,17 +83,17 @@ export default function EditEntryPage({ params }: EditEntryPageProps) {
         createdAt: new Date(entry.createdAt)
       }
 
-      await updateJournalEntry(user.uid, journalId, params.id, updatedEntry)
+      await updateJournalEntry(user.uid, journalId, resolvedParams.id, updatedEntry)
       router.push('/journal/browse')
     } catch (err) {
       console.error('Error updating entry:', err)
       setError(err instanceof Error ? err.message : 'Failed to update entry')
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
@@ -155,7 +156,7 @@ export default function EditEntryPage({ params }: EditEntryPageProps) {
               <Button variant="outline" onClick={() => router.back()}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={isLoading}>
                 Save Changes
               </Button>
             </div>
