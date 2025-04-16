@@ -8,6 +8,7 @@ import { Star, Save } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { getCategoryStyles } from "@/lib/constants"
+import { TagInput } from "@/components/ui/tag-input"
 
 interface GratitudeReflectionFormProps {
   onSubmit?: (formData: FormData) => Promise<void>
@@ -20,6 +21,7 @@ export default function GratitudeReflectionForm({ onSubmit }: GratitudeReflectio
   const [highlight, setHighlight] = useState("")
   const [learnings, setLearnings] = useState("")
   const [nextSteps, setNextSteps] = useState("")
+  const [tags, setTags] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const categoryStyles = getCategoryStyles('gratitude-reflection')
@@ -45,7 +47,8 @@ export default function GratitudeReflectionForm({ onSubmit }: GratitudeReflectio
         gratitudePoints,
         highlight,
         learnings,
-        nextSteps
+        nextSteps,
+        tags
       }
 
       formData.set('category', 'gratitude-reflection')
@@ -185,6 +188,14 @@ export default function GratitudeReflectionForm({ onSubmit }: GratitudeReflectio
               onChange={(e) => setNextSteps(e.target.value)}
               placeholder="What actions will you take based on your reflections? How will you apply these insights?"
               className="min-h-[100px]"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <Label>Tags</Label>
+            <TagInput
+              tags={tags}
+              onTagsChange={setTags}
             />
           </div>
         </CardContent>

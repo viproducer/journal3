@@ -16,7 +16,8 @@ import {
   setDoc,
   collectionGroup,
   writeBatch,
-  arrayUnion
+  arrayUnion,
+  QueryDocumentSnapshot
 } from 'firebase/firestore';
 import { db } from './config';
 import { Journal, JournalEntry, MarketplaceTemplate, UserSubscription, UserProfile, UserRole, Goal, ProgressHistory } from './types';
@@ -61,21 +62,25 @@ function convertToJournal(doc: DocumentData): Journal {
 }
 
 // Helper function to convert Firestore document to JournalEntry type
-function convertToJournalEntry(doc: DocumentData): JournalEntry {
-  // Handle both Firestore QueryDocumentSnapshot and raw data objects
-  const data = doc.data ? doc.data() : doc;
+function convertToJournalEntry(doc: QueryDocumentSnapshot | { id: string, data: () => any } | DocumentData): JournalEntry {
+  const data = 'data' in doc ? doc.data() : doc;
+  console.log('Converting document to JournalEntry:', {
+    docId: 'id' in doc ? doc.id : data.id,
+    tags: data.tags,
+    metadata: data.metadata
+  })
   return {
-    id: doc.id,
-    journalId: data.journalId,
+    id: 'id' in doc ? doc.id : data.id,
     userId: data.userId,
+    journalId: data.journalId,
     content: data.content,
-    category: data.category || 'general',
-    type: data.type || 'entry',
+    category: data.category,
+    type: data.type,
     tags: data.tags || [],
+    metadata: data.metadata || {},
     createdAt: data.createdAt?.toDate() || new Date(),
-    updatedAt: data.updatedAt?.toDate() || new Date(),
-    metadata: data.metadata || {}
-  };
+    updatedAt: data.updatedAt?.toDate() || new Date()
+  }
 }
 
 // Journals
@@ -538,9 +543,9 @@ export async function createGoal(goal: Omit<Goal, 'id'>): Promise<Goal> {
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
       metadata: {
+        ...goal.metadata,
         category: goal.category,
-        type: goal.type,
-        ...goal.metadata
+        type: goal.type
       }
     };
 

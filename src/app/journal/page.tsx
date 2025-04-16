@@ -4,7 +4,7 @@ console.log('DEBUG: Journal page script loaded');
 console.log('Loading journal page module');
 
 import React from "react"
-import { useEffect, useState, type ReactNode, useCallback } from "react"
+import { useEffect, useState, type ReactNode, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -37,6 +37,9 @@ import {
   ShoppingBag,
   Activity,
   Trash2,
+  X,
+  StickyNote,
+  ScrollText,
 } from "lucide-react"
 import { getCategoryStyles, formatCategoryName } from "@/lib/constants"
 import { cn } from "@/lib/utils"
@@ -61,6 +64,56 @@ import { createJournal } from "@/lib/firebase/db"
 import DailyAffirmation from "@/components/DailyAffirmation"
 import { Navigation } from "@/components/Navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts'
+
+// Add these type definitions near the top of the file
+type DateRange = {
+  from: string;
+  to: string;
+};
+
+type ViewMode = 'DIARY' | 'POSTIT' | 'PAPER' | 'GRID';
+
+const VIEW_OPTIONS = {
+  DIARY: 'Diary',
+  POSTIT: 'Post-it',
+  PAPER: 'Paper',
+  GRID: 'Grid'
+} as const;
+
+// Add these constants near the top of the file
+const CATEGORIES = [
+  { id: 'mood-feelings', name: 'Mood & Feelings', icon: Heart, color: 'bg-red-500', hoverColor: 'hover:bg-red-500' },
+  { id: 'tracking-logs', name: 'Tracking & Logs', icon: BarChart2, color: 'bg-blue-500', hoverColor: 'hover:bg-blue-500' },
+  { id: 'gratitude-reflection', name: 'Gratitude & Reflection', icon: Star, color: 'bg-yellow-500', hoverColor: 'hover:bg-yellow-500' },
+  { id: 'goals-intentions', name: 'Goals & Intentions', icon: Target, color: 'bg-green-500', hoverColor: 'hover:bg-green-500' },
+  { id: 'future-visioning', name: 'Future Visioning', icon: Compass, color: 'bg-purple-500', hoverColor: 'hover:bg-purple-500' },
+  { id: 'journaling-prompts', name: 'Journaling Prompts', icon: HelpCircle, color: 'bg-indigo-500', hoverColor: 'hover:bg-indigo-500' },
+  { id: 'daily-checkins', name: 'Daily Check-ins', icon: Sun, color: 'bg-orange-500', hoverColor: 'hover:bg-orange-500' },
+  { id: 'challenges-streaks', name: 'Challenges & Streaks', icon: Zap, color: 'bg-pink-500', hoverColor: 'hover:bg-pink-500' },
+] as const;
+
+const EXPANDED_FIELDS = {
+  'mood-feelings': ['moodLevel', 'primaryEmotion', 'secondaryEmotions'],
+  'tracking-logs': ['value', 'unit', 'notes'],
+  'gratitude-reflection': ['gratitudeLevel', 'reflection'],
+  'goals-intentions': ['goalType', 'deadline', 'progress'],
+  'future-visioning': ['timeframe', 'visionType'],
+  'journaling-prompts': ['promptType', 'responseType'],
+  'daily-checkins': ['checkinType', 'status'],
+  'challenges-streaks': ['challengeType', 'streakCount'],
+} as const;
+
+// Update the type for fields in the entry card
+type ExpandedField = keyof typeof EXPANDED_FIELDS;
 
 // Helper function to calculate median
 function calculateMedian(numbers: number[]): number {
@@ -97,6 +150,15 @@ export default function DashboardPage() {
     avgTime: 0,
     consistency: 0
   });
+
+  // Add these state variables inside the DashboardPage component
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [dateRange, setDateRange] = useState<DateRange>({ from: '', to: '' });
+  const [viewMode, setViewMode] = useState<ViewMode>('DIARY');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
+  const [moodTimeRange, setMoodTimeRange] = useState<'week' | 'month' | 'year'>('week')
 
   useEffect(() => {
     console.log('JournalPage useEffect - Auth state:', { 
@@ -409,6 +471,113 @@ export default function DashboardPage() {
 
   // Total entries
   const totalEntries = entries.length
+
+  // Add this function to get entry style based on view mode
+  const getEntryStyle = (mode: ViewMode, index: number): string => {
+    switch (mode) {
+      case 'DIARY':
+        return 'bg-white shadow-sm hover:shadow-md transition-shadow';
+      case 'POSTIT':
+        return `bg-yellow-50 shadow-md hover:shadow-lg transition-shadow transform hover:-translate-y-1`;
+      case 'PAPER':
+        return 'bg-white border border-gray-200 shadow-sm hover:shadow-md transition-shadow';
+      case 'GRID':
+        return 'bg-white shadow-sm hover:shadow-md transition-shadow';
+      default:
+        return 'bg-white shadow-sm hover:shadow-md transition-shadow';
+    }
+  };
+
+  // Add this function to refresh entries
+  const refreshEntries = useCallback(async () => {
+    if (!user) return;
+    try {
+      setLoading(true);
+      const allEntries: JournalEntry[] = [];
+      for (const journal of journals) {
+        const journalEntries = await getJournalEntries(user.uid, journal.id!);
+        allEntries.push(...journalEntries);
+      }
+      setEntries(allEntries);
+    } catch (err) {
+      console.error('Error refreshing entries:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [user, journals]);
+
+  // Add this computed value for filtered entries
+  const filteredEntries = useMemo(() => {
+    return entries.filter(entry => {
+      // Filter by search query
+      if (searchQuery) {
+        const searchLower = searchQuery.toLowerCase();
+        const matchesSearch = 
+          entry.metadata?.title?.toLowerCase().includes(searchLower) ||
+          entry.content.toLowerCase().includes(searchLower) ||
+          entry.tags?.some(tag => tag.toLowerCase().includes(searchLower));
+        if (!matchesSearch) return false;
+      }
+
+      // Filter by date range
+      if (dateRange.from || dateRange.to) {
+        const entryDate = new Date(entry.createdAt);
+        if (dateRange.from && entryDate < new Date(dateRange.from)) return false;
+        if (dateRange.to && entryDate > new Date(dateRange.to)) return false;
+      }
+
+      // Filter by categories
+      if (selectedCategories.length > 0 && !selectedCategories.includes(entry.type || '')) {
+        return false;
+      }
+
+      // Filter by tags
+      if (selectedTags.length > 0 && !entry.tags?.some(tag => selectedTags.includes(tag))) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [entries, searchQuery, dateRange, selectedCategories, selectedTags]);
+
+  // Add this computed value for all tags
+  const allTags = useMemo(() => {
+    const tags = new Set<string>();
+    entries.forEach(entry => {
+      entry.tags?.forEach(tag => tags.add(tag));
+    });
+    return Array.from(tags).sort();
+  }, [entries]);
+
+  // Add this computed value after the other useMemo hooks
+  const moodEntries = useMemo(() => {
+    const now = new Date()
+    const startDate = new Date()
+    
+    switch (moodTimeRange) {
+      case 'week':
+        startDate.setDate(now.getDate() - 7)
+        break
+      case 'month':
+        startDate.setMonth(now.getMonth() - 1)
+        break
+      case 'year':
+        startDate.setFullYear(now.getFullYear() - 1)
+        break
+    }
+
+    return entries
+      .filter(entry => entry.type === 'mood-feelings' && entry.metadata?.moodLevel)
+      .filter(entry => {
+        const entryDate = new Date(entry.createdAt)
+        return entryDate >= startDate && entryDate <= now
+      })
+      .map(entry => ({
+        date: entry.createdAt,
+        moodLevel: Number(entry.metadata?.moodLevel) || 0
+      }))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  }, [entries, moodTimeRange])
 
   if (authLoading) {
     console.log('Showing auth loading state');
@@ -750,12 +919,12 @@ export default function DashboardPage() {
                 </Button>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {entries.slice(0, 3).map((entry) => {
                   const categoryStyles = getCategoryStyles(entry.type || 'mood-feelings')
                   return (
                     <Card key={entry.id} className="overflow-hidden">
-                      <CardContent className="p-4">
+                      <CardContent className="p-6">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <div className={cn(
@@ -787,7 +956,6 @@ export default function DashboardPage() {
                                   
                                   setLoading(true)
                                   await deleteJournalEntry(user.uid, entry.journalId, entry.id!)
-                                  // Reload the page to refresh all data
                                   window.location.reload()
                                 } catch (err) {
                                   console.error('Error deleting entry:', err)
@@ -801,16 +969,16 @@ export default function DashboardPage() {
                             <span className="sr-only">Delete entry</span>
                           </Button>
                         </div>
-                        <div className="mt-2">
+                        <div className="mt-4">
                           <h3 className="font-medium">
                             {entry.metadata?.title || formatCategoryName(entry.type || 'mood-feelings')}
                           </h3>
-                          <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                          <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
                             {entry.metadata?.firstTextBox || entry.content}
                           </p>
                         </div>
                         {entry.tags && entry.tags.length > 0 && (
-                          <div className="mt-3 flex flex-wrap gap-1">
+                          <div className="mt-4 flex flex-wrap gap-1">
                             {entry.tags.map((tag) => (
                               <span
                                 key={tag} 
@@ -821,9 +989,9 @@ export default function DashboardPage() {
                             ))}
                           </div>
                         )}
-                        <div className="mt-3">
+                        <div className="mt-4">
                           <Link
-                            href={`/journal/${entry.id}`}
+                            href={`/journal/${entry.journalId}/entry/${entry.id}`}
                             className="inline-flex items-center justify-center gap-2 text-sm font-medium text-primary hover:text-primary/80"
                           >
                             Read More

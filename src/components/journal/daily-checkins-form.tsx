@@ -9,6 +9,7 @@ import { Slider } from "@/components/ui/slider"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { TagInput } from "@/components/ui/tag-input"
 
 interface DailyCheckinsFormProps {
   onSubmit?: (formData: FormData) => Promise<void>
@@ -26,6 +27,7 @@ export default function DailyCheckinsForm({ onSubmit }: DailyCheckinsFormProps) 
   const [todaysWins, setTodaysWins] = useState("")
   const [gratitude, setGratitude] = useState("")
   const [focusForTomorrow, setFocusForTomorrow] = useState("")
+  const [tags, setTags] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,7 +49,9 @@ export default function DailyCheckinsForm({ onSubmit }: DailyCheckinsFormProps) 
         biggestChallenge,
         todaysWins,
         gratitude,
-        focusForTomorrow
+        focusForTomorrow,
+        title,
+        tags
       }
 
       formData.set('category', 'daily-checkins')
@@ -97,6 +101,14 @@ export default function DailyCheckinsForm({ onSubmit }: DailyCheckinsFormProps) 
               onChange={(e) => setContent(e.target.value)}
               placeholder="Write your thoughts and reflections here..."
               className="min-h-[200px]"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <Label>Tags</Label>
+            <TagInput
+              tags={tags}
+              onTagsChange={setTags}
             />
           </div>
 

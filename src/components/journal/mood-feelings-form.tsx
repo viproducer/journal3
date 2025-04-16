@@ -9,6 +9,7 @@ import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { TagInput } from "@/components/ui/tag-input"
 
 interface MoodFeelingsFormProps {
   onSubmit?: (formData: FormData) => Promise<void>
@@ -23,6 +24,7 @@ export default function MoodFeelingsForm({ onSubmit }: MoodFeelingsFormProps) {
   const [triggers, setTriggers] = useState("")
   const [physical, setPhysical] = useState("")
   const [reflection, setReflection] = useState("")
+  const [tags, setTags] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const emotions = [
@@ -57,7 +59,9 @@ export default function MoodFeelingsForm({ onSubmit }: MoodFeelingsFormProps) {
         healthyResponse,
         triggers,
         physical,
-        reflection
+        reflection,
+        title,
+        tags
       }
 
       // Set category and type in both formData and metadata
@@ -223,6 +227,14 @@ export default function MoodFeelingsForm({ onSubmit }: MoodFeelingsFormProps) {
               onChange={(e) => setReflection(e.target.value)}
               placeholder="What can you learn from these emotions? How might you respond differently next time?"
               className="min-h-[100px]"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <Label>Tags</Label>
+            <TagInput
+              tags={tags}
+              onTagsChange={setTags}
             />
           </div>
         </CardContent>

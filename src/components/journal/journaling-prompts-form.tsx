@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+import { TagInput } from "@/components/ui/tag-input"
 
 type PromptCategory = "self-discovery" | "creativity" | "gratitude" | "reflection" | "growth"
 
@@ -27,6 +28,7 @@ export default function JournalingPromptsForm({ onSubmit }: JournalingPromptsFor
   const [currentPrompt, setCurrentPrompt] = useState("")
   const [promptResponse, setPromptResponse] = useState("")
   const [insights, setInsights] = useState("")
+  const [tags, setTags] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Sample prompts by category
@@ -248,7 +250,9 @@ export default function JournalingPromptsForm({ onSubmit }: JournalingPromptsFor
         promptCategory,
         currentPrompt,
         promptResponse,
-        insights
+        insights,
+        title,
+        tags
       }
 
       // Set category and type in both formData and metadata
@@ -354,6 +358,14 @@ export default function JournalingPromptsForm({ onSubmit }: JournalingPromptsFor
               onChange={(e) => setInsights(e.target.value)}
               placeholder="What insights or realizations did you have while responding to this prompt?"
               className="min-h-[100px]"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <Label>Tags</Label>
+            <TagInput
+              tags={tags}
+              onTagsChange={setTags}
             />
           </div>
         </CardContent>

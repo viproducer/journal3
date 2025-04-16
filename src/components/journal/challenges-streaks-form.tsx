@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Save } from "lucide-react"
+import { TagInput } from "@/components/ui/tag-input"
 
 interface ChallengesStreaksFormProps {
   onSubmit?: (data: FormData) => void
@@ -30,6 +31,7 @@ export function ChallengesStreaksForm({ onSubmit }: ChallengesStreaksFormProps) 
   const [difficulties, setDifficulties] = useState("")
   const [learnings, setLearnings] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [tags, setTags] = useState<string[]>([])
 
   // Calculate progress percentage
   const progressPercentage = (currentDay / totalDays) * 100
@@ -52,7 +54,9 @@ export function ChallengesStreaksForm({ onSubmit }: ChallengesStreaksFormProps) 
         todayActivity,
         difficulties,
         learnings,
-        progressPercentage: (currentDay / totalDays) * 100
+        progressPercentage: (currentDay / totalDays) * 100,
+        title,
+        tags
       }
 
       formData.set("metadata", JSON.stringify(metadata))
@@ -243,6 +247,14 @@ export function ChallengesStreaksForm({ onSubmit }: ChallengesStreaksFormProps) 
               onChange={(e) => setLearnings(e.target.value)}
               placeholder="What have you learned so far from this challenge? How are you growing?"
               className="min-h-[100px]"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <Label>Tags</Label>
+            <TagInput
+              tags={tags}
+              onTagsChange={setTags}
             />
           </div>
         </CardContent>

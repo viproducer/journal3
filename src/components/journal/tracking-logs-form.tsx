@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Progress } from "@/components/ui/progress"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { TagInput } from "@/components/ui/tag-input"
 
 type TrackingType = "habit" | "fitness" | "nutrition" | "sleep" | "mood" | "finance" | "productivity" | "custom"
 
@@ -60,6 +61,7 @@ export default function TrackingLogsForm({ onSubmit }: TrackingLogsFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [tags, setTags] = useState<string[]>([])
 
   useEffect(() => {
     if (user?.uid) {
@@ -124,6 +126,8 @@ export default function TrackingLogsForm({ onSubmit }: TrackingLogsFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!user) return
+
     setIsSubmitting(true)
     try {
       const form = e.target as HTMLFormElement
@@ -138,7 +142,8 @@ export default function TrackingLogsForm({ onSubmit }: TrackingLogsFormProps) {
         isGoalTracking,
         linkedGoalId,
         metrics,
-        targetProgress
+        targetProgress,
+        tags
       }
 
       formData.set('category', 'tracking-logs')
@@ -451,6 +456,14 @@ export default function TrackingLogsForm({ onSubmit }: TrackingLogsFormProps) {
               </Button>
             </div>
           )}
+
+          <div className="space-y-3">
+            <Label>Tags</Label>
+            <TagInput
+              tags={tags}
+              onTagsChange={setTags}
+            />
+          </div>
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={isSubmitting}>

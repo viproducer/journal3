@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Save } from "lucide-react"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { TagInput } from "@/components/ui/tag-input"
 
 interface FutureVisioningFormProps {
   onSubmit?: (formData: FormData) => Promise<void>
@@ -17,6 +18,7 @@ interface FutureVisioningFormProps {
 export default function FutureVisioningForm({ onSubmit }: FutureVisioningFormProps) {
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
+  const [visionYears, setVisionYears] = useState("5")
   const [visionAreas, setVisionAreas] = useState({
     career: "",
     relationships: "",
@@ -25,6 +27,7 @@ export default function FutureVisioningForm({ onSubmit }: FutureVisioningFormPro
     financial: "",
     spiritual: ""
   })
+  const [tags, setTags] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,7 +39,10 @@ export default function FutureVisioningForm({ onSubmit }: FutureVisioningFormPro
       
       // Add metadata to form data
       const metadata = {
-        visionAreas
+        title,
+        visionYears,
+        visionAreas,
+        tags
       }
 
       // Set category and type in both formData and metadata
@@ -55,7 +61,7 @@ export default function FutureVisioningForm({ onSubmit }: FutureVisioningFormPro
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Future Visioning</CardTitle>
@@ -80,6 +86,21 @@ export default function FutureVisioningForm({ onSubmit }: FutureVisioningFormPro
           </div>
 
           <div className="space-y-3">
+            <Label htmlFor="visionYears">Vision Timeline</Label>
+            <Select value={visionYears} onValueChange={setVisionYears}>
+              <SelectTrigger id="visionYears">
+                <SelectValue placeholder="Select vision timeline" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">1 Year Vision</SelectItem>
+                <SelectItem value="3">3 Year Vision</SelectItem>
+                <SelectItem value="5">5 Year Vision</SelectItem>
+                <SelectItem value="10">10 Year Vision</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-3">
             <Label htmlFor="content">Overview</Label>
             <Textarea
               id="content"
@@ -91,17 +112,81 @@ export default function FutureVisioningForm({ onSubmit }: FutureVisioningFormPro
             />
           </div>
 
-          {Object.entries(visionAreas).map(([area, value]) => (
-            <div key={area} className="space-y-3">
-              <Label htmlFor={area}>{area.charAt(0).toUpperCase() + area.slice(1)}</Label>
-              <Textarea
-                id={area}
-                value={value}
-                onChange={(e) => setVisionAreas(prev => ({ ...prev, [area]: e.target.value }))}
-                placeholder={`Describe your vision for your ${area}...`}
-              />
-            </div>
-          ))}
+          <Tabs defaultValue="career" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="career">Career</TabsTrigger>
+              <TabsTrigger value="personal">Personal</TabsTrigger>
+              <TabsTrigger value="financial">Financial</TabsTrigger>
+            </TabsList>
+            <TabsContent value="career" className="space-y-4">
+              <div className="space-y-3">
+                <Label>Career Vision</Label>
+                <Textarea
+                  value={visionAreas.career}
+                  onChange={(e) => setVisionAreas(prev => ({ ...prev, career: e.target.value }))}
+                  placeholder="Describe your career aspirations and professional goals..."
+                  className="min-h-[200px]"
+                />
+              </div>
+            </TabsContent>
+            <TabsContent value="personal" className="space-y-4">
+              <div className="space-y-3">
+                <Label>Personal Vision</Label>
+                <Textarea
+                  value={visionAreas.personal}
+                  onChange={(e) => setVisionAreas(prev => ({ ...prev, personal: e.target.value }))}
+                  placeholder="Describe your personal growth and life goals..."
+                  className="min-h-[200px]"
+                />
+              </div>
+              <div className="space-y-3">
+                <Label>Relationships</Label>
+                <Textarea
+                  value={visionAreas.relationships}
+                  onChange={(e) => setVisionAreas(prev => ({ ...prev, relationships: e.target.value }))}
+                  placeholder="Describe your vision for relationships and social connections..."
+                  className="min-h-[200px]"
+                />
+              </div>
+              <div className="space-y-3">
+                <Label>Health & Wellness</Label>
+                <Textarea
+                  value={visionAreas.health}
+                  onChange={(e) => setVisionAreas(prev => ({ ...prev, health: e.target.value }))}
+                  placeholder="Describe your vision for health and wellness..."
+                  className="min-h-[200px]"
+                />
+              </div>
+              <div className="space-y-3">
+                <Label>Spiritual Growth</Label>
+                <Textarea
+                  value={visionAreas.spiritual}
+                  onChange={(e) => setVisionAreas(prev => ({ ...prev, spiritual: e.target.value }))}
+                  placeholder="Describe your vision for spiritual growth and development..."
+                  className="min-h-[200px]"
+                />
+              </div>
+            </TabsContent>
+            <TabsContent value="financial" className="space-y-4">
+              <div className="space-y-3">
+                <Label>Financial Vision</Label>
+                <Textarea
+                  value={visionAreas.financial}
+                  onChange={(e) => setVisionAreas(prev => ({ ...prev, financial: e.target.value }))}
+                  placeholder="Describe your financial goals and aspirations..."
+                  className="min-h-[200px]"
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <div className="space-y-3">
+            <Label>Tags</Label>
+            <TagInput
+              tags={tags}
+              onTagsChange={setTags}
+            />
+          </div>
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={isSubmitting}>

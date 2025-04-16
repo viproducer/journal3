@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getCategoryStyles, formatCategoryName } from "@/lib/constants"
 import { Navigation } from "@/components/Navigation"
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
 
 const VIEW_OPTIONS = {
   DIARY: 'diary',
@@ -149,6 +150,15 @@ export default function BrowseJournalPage() {
         for (const journal of userJournals) {
           try {
             const journalEntries = await getJournalEntries(user.uid, journal.id!)
+            console.log('Loaded entries for journal:', {
+              journalId: journal.id,
+              entries: journalEntries.map(e => ({
+                id: e.id,
+                type: e.type,
+                tags: e.tags,
+                metadata: e.metadata
+              }))
+            })
             allEntries.push(...journalEntries)
           } catch (entriesError) {
             console.warn(`Could not load entries for journal ${journal.id}:`, entriesError)
@@ -162,13 +172,27 @@ export default function BrowseJournalPage() {
           return dateB.getTime() - dateA.getTime()
         })
         
+        console.log('All entries loaded:', allEntries.map(e => ({
+          id: e.id,
+          type: e.type,
+          tags: e.tags,
+          metadata: e.metadata
+        })))
+        
         setEntries(allEntries)
         
         // Extract all unique tags
         const tags = new Set<string>()
         allEntries.forEach(entry => {
-          entry.tags?.forEach(tag => tags.add(tag))
+          if (entry.tags) {
+            console.log('Entry tags:', {
+              entryId: entry.id,
+              tags: entry.tags
+            })
+            entry.tags.forEach(tag => tags.add(tag))
+          }
         })
+        console.log('All unique tags:', Array.from(tags))
         setAllTags(Array.from(tags))
         
         setFilteredEntries(allEntries)
@@ -460,120 +484,109 @@ export default function BrowseJournalPage() {
             const isExpanded = expandedEntryId === entry.id
             const fields = EXPANDED_FIELDS[entry.type as keyof typeof EXPANDED_FIELDS] || []
             
+            // Debug logging
+            console.log('Entry:', {
+              id: entry.id,
+              type: entry.type,
+              tags: entry.tags,
+              metadata: entry.metadata
+            })
+            
             return (
-              <div 
-                key={entry.id} 
-                className={cn(
-                  getEntryStyle(viewMode, index),
-                  isExpanded && "col-span-full"
-                )}
-              >
-                <div className="flex items-start justify-between relative z-10">
-                  <div className="flex-1">
-                    <h3 className="font-medium mb-1">{entry.metadata?.title || "Journal Entry"}</h3>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="h-3.5 w-3.5" />
-                      <span>
-                        {new Date(entry.createdAt).toLocaleString('en-US', {
-                          month: 'long',
-                          day: 'numeric',
-                          hour: 'numeric',
-                          minute: '2-digit',
-                          hour12: true
-                        })}
+              <Card key={entry.id} className={getEntryStyle(viewMode, index)}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium",
+                        categoryStyles.bgColorLight,
+                        categoryStyles.color
+                      )}>
+                        {React.createElement(categoryStyles.icon, { className: "h-3.5 w-3.5" })}
+                        {formatCategoryName(entry.type || 'mood-feelings')}
+                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        {format(new Date(entry.createdAt), 'MMM d, yyyy')}
                       </span>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className={cn(
-                      "inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium",
-                      categoryStyles.bgColorLight,
-                      categoryStyles.color
-                    )}>
-                      {React.createElement(categoryStyles.icon, { className: "h-3.5 w-3.5" })}
-                      {formatCategoryName(entry.type || 'mood-feelings')}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 hover:bg-muted text-red-500 hover:text-red-600"
-                        onClick={async () => {
-                          if (!user) return;
-                          if (window.confirm('Are you sure you want to delete this entry?')) {
-                            try {
-                              if (!entry.journalId) {
-                                console.error('No journal ID found in entry')
-                                return
-                              }
-                              
-                              setLoading(true)
-                              await deleteJournalEntry(user.uid, entry.journalId, entry.id!)
-                              await refreshEntries()
-                            } catch (err) {
-                              console.error('Error deleting entry:', err)
-                            } finally {
-                              setLoading(false)
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 hover:bg-muted text-red-500 hover:text-red-600"
+                      onClick={async () => {
+                        if (!user) return;
+                        if (window.confirm('Are you sure you want to delete this entry?')) {
+                          try {
+                            if (!entry.journalId) {
+                              console.error('No journal ID found in entry')
+                              return
                             }
+                            
+                            setLoading(true)
+                            await deleteJournalEntry(user.uid, entry.journalId, entry.id!)
+                            refreshEntries()
+                          } catch (err) {
+                            console.error('Error deleting entry:', err)
+                          } finally {
+                            setLoading(false)
                           }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Delete entry</span>
-                      </Button>
-                    </div>
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">Delete entry</span>
+                    </Button>
                   </div>
-                </div>
-                
-                <div className={cn(
-                  "transition-all duration-500 ease-in-out relative z-10",
-                  isExpanded ? "max-h-[5000px] opacity-100" : "max-h-20 overflow-hidden opacity-90"
-                )}>
-                  {/* Main content */}
-                  <div className="prose prose-sm max-w-none relative z-10">
-                    <p className="text-sm whitespace-pre-wrap">
-                      {entry.content}
+                  <div className="mt-2">
+                    <h3 className="font-medium">
+                      {entry.metadata?.title || formatCategoryName(entry.type || 'mood-feelings')}
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                      {entry.metadata?.firstTextBox || entry.content}
                     </p>
                   </div>
-
-                  {/* Metadata fields */}
-                  {isExpanded && entry.metadata && (
-                    <div className="mt-4 space-y-4 border-t pt-4">
-                      {Object.entries(entry.metadata).map(([key, value]) => {
-                        if (key === 'type' || key === 'title' || !value) return null;
-                        return (
-                          <div key={key} className="space-y-1">
-                            <h4 className="text-sm font-medium capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</h4>
-                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{value}</p>
-                          </div>
-                        );
-                      })}
+                  {isExpanded && fields.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {fields.map((field) => (
+                        <div key={field} className="space-y-1">
+                          <h4 className="text-sm font-medium capitalize">{field}</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {entry.metadata?.[field] || 'Not specified'}
+                          </p>
+                        </div>
+                      ))}
                     </div>
                   )}
-                </div>
-
-                {/* Tags */}
-                <div className="flex flex-wrap gap-1">
-                  {entry.tags?.map((tag) => (
-                    <span 
-                      key={tag} 
-                      className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:bg-secondary"
+                  {entry.tags && entry.tags.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      {entry.tags.map((tag) => (
+                        <span
+                          key={tag} 
+                          className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:bg-secondary"
+                        >
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-3 flex justify-between">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setExpandedEntryId(isExpanded ? null : entry.id || null)}
                     >
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Expand/Collapse button */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setExpandedEntryId(isExpanded ? null : entry.id || null)}
-                  className="self-center mt-2"
-                >
-                  {isExpanded ? "Show Less" : "Read More"}
-                </Button>
-              </div>
+                      {isExpanded ? 'Show Less' : 'Show More'}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => router.push(`/journal/${entry.journalId}/entry/${entry.id}`)}
+                    >
+                      View Details
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             )
           })}
         </div>
