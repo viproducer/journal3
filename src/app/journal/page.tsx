@@ -397,14 +397,14 @@ export default function DashboardPage() {
 
   // Calculate category distribution from entries
   const categoryDistribution = [
-    { name: "Mood & Feelings", count: entries.filter(e => e.metadata?.type === "mood-feelings").length, icon: getIconForCategory("mood-feelings"), color: "bg-red-500" },
-    { name: "Tracking & Logs", count: entries.filter(e => e.metadata?.type === "tracking-logs").length, icon: getIconForCategory("tracking-logs"), color: "bg-blue-500" },
-    { name: "Gratitude & Reflection", count: entries.filter(e => e.metadata?.type === "gratitude-reflection").length, icon: getIconForCategory("gratitude-reflection"), color: "bg-yellow-500" },
-    { name: "Goals & Intentions", count: entries.filter(e => e.metadata?.type === "goals-intentions").length, icon: getIconForCategory("goals-intentions"), color: "bg-green-500" },
-    { name: "Future Visioning", count: entries.filter(e => e.metadata?.type === "future-visioning").length, icon: getIconForCategory("future-visioning"), color: "bg-purple-500" },
-    { name: "Journaling Prompts", count: entries.filter(e => e.metadata?.type === "journaling-prompts").length, icon: getIconForCategory("journaling-prompts"), color: "bg-indigo-500" },
-    { name: "Daily Check-ins", count: entries.filter(e => e.metadata?.type === "daily-checkins").length, icon: getIconForCategory("daily-checkins"), color: "bg-orange-500" },
-    { name: "Challenges & Streaks", count: entries.filter(e => e.metadata?.type === "challenges-streaks").length, icon: getIconForCategory("challenges-streaks"), color: "bg-pink-500" },
+    { name: "Mood & Feelings", count: entries.filter(e => e.type === "mood-feelings").length, icon: getIconForCategory("mood-feelings"), color: "bg-red-500" },
+    { name: "Tracking & Logs", count: entries.filter(e => e.type === "tracking-logs").length, icon: getIconForCategory("tracking-logs"), color: "bg-blue-500" },
+    { name: "Gratitude & Reflection", count: entries.filter(e => e.type === "gratitude-reflection").length, icon: getIconForCategory("gratitude-reflection"), color: "bg-yellow-500" },
+    { name: "Goals & Intentions", count: entries.filter(e => e.type === "goals-intentions").length, icon: getIconForCategory("goals-intentions"), color: "bg-green-500" },
+    { name: "Future Visioning", count: entries.filter(e => e.type === "future-visioning").length, icon: getIconForCategory("future-visioning"), color: "bg-purple-500" },
+    { name: "Journaling Prompts", count: entries.filter(e => e.type === "journaling-prompts").length, icon: getIconForCategory("journaling-prompts"), color: "bg-indigo-500" },
+    { name: "Daily Check-ins", count: entries.filter(e => e.type === "daily-checkins").length, icon: getIconForCategory("daily-checkins"), color: "bg-orange-500" },
+    { name: "Challenges & Streaks", count: entries.filter(e => e.type === "challenges-streaks").length, icon: getIconForCategory("challenges-streaks"), color: "bg-pink-500" },
   ]
 
   // Total entries
@@ -752,7 +752,7 @@ export default function DashboardPage() {
 
               <div className="space-y-4">
                 {entries.slice(0, 3).map((entry) => {
-                  const categoryStyles = getCategoryStyles(entry.metadata?.type || 'mood-feelings')
+                  const categoryStyles = getCategoryStyles(entry.type || 'mood-feelings')
                   return (
                     <Card key={entry.id} className="overflow-hidden">
                       <CardContent className="p-4">
@@ -764,7 +764,7 @@ export default function DashboardPage() {
                               categoryStyles.color
                             )}>
                               {React.createElement(categoryStyles.icon, { className: "h-3.5 w-3.5" })}
-                              {formatCategoryName(entry.metadata?.type || 'mood-feelings')}
+                              {formatCategoryName(entry.type || 'mood-feelings')}
                             </div>
                             <span className="text-sm text-muted-foreground">
                               {entry.createdAt instanceof Date 
@@ -803,7 +803,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="mt-2">
                           <h3 className="font-medium">
-                            {entry.metadata?.title || formatCategoryName(entry.metadata?.type || 'mood-feelings')}
+                            {entry.metadata?.title || formatCategoryName(entry.type || 'mood-feelings')}
                           </h3>
                           <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
                             {entry.metadata?.firstTextBox || entry.content}
